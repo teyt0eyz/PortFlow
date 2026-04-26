@@ -18,20 +18,28 @@ export default function SellModal({ stock, onSell, onClose }: Props) {
   const [sellDate, setSellDate] = useState(new Date().toISOString().split('T')[0]);
   const [sellPrice, setSellPrice] = useState(String(stock.currentPrice));
   const [totalSellAmount, setTotalSellAmount] = useState('');
+  const [sellCommission, setSellCommission] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const sellPriceNum = Number(sellPrice) || 0;
   const totalSellAmountNum = Number(totalSellAmount) || 0;
   const sharesSold = sellPriceNum > 0 ? totalSellAmountNum / sellPriceNum : 0;
-  const maxAmount = stock.purchasePrice * stock.shares; // original cost — used for max reference
   const maxProceeds = stock.currentPrice * stock.shares;
   const isOverSelling = sharesSold > stock.shares + 0.0001;
 
   const costBasis = stock.purchasePrice * sharesSold;
   const proceeds = totalSellAmountNum;
   const profit = proceeds - costBasis;
-  const profitPct = costBasis > 0 ? (profit / costBasis) * 100 : 0;
-  const isProfit = profit >= 0;
+
+  const sellCommissionNum = Number(sellCommission) || 0;
+  // Proportional share of buy commission for this sale
+  const proportionalBuyCommission = stock.buyCommission && stock.shares > 0
+    ? (sharesSold / stock.shares) * stock.buyCommission : 0;
+  const netProfit = profit - sellCommissionNum - proportionalBuyCommission;
+  const totalFees = sellCommissionNum + proportionalBuyCommission;
+  const netCost = costBasis + proportionalBuyCommission;
+  const netProfitPct = netCost > 0 ? (netProfit / netCost) * 100 : 0;
+  const isProfit = netProfit >= 0;
 
   function clearError(key: string) {
     setErrors((e) => { const n = { ...e }; delete n[key]; return n; });
@@ -61,7 +69,16 @@ export default function SellModal({ stock, onSell, onClose }: Props) {
       proceeds,
       costBasis,
       profit,
+      sellCommission: sellCommissionNum || undefined,
+      netProfit,
     });
+  }
+
+  function calcAutoSellCommission(amount: number): number {
+    if (stock.category === 'us' || stock.category === 'fund') return 0;
+    // Thai SET: 0.15% + VAT 7% + 0.1% stamp duty
+    const commission = Math.max(amount * 0.0015, 50);
+    return Math.round(commission * 1.07 + amount * 0.001);
   }
 
   function fillSellAll() {
@@ -156,29 +173,63 @@ export default function SellModal({ stock, onSell, onClose }: Props) {
             ขายทั้งหมด ที่ราคาตลาด ({fmt(maxProceeds)})
           </button>
 
+          {/* Sell Commission */}
+          <div>
+            <label className="label">ค่าคอมมิชชั่น/ค่าธรรมเนียมขาย ({sym})</label>
+            <div className="flex gap-2">
+              <input type="number" inputMode="decimal"
+                value={sellCommission}
+                onChange={(e) => setSellCommission(e.target.value)}
+                placeholder="0.00" min="0" step="0.01"
+                className="input-field flex-1" />
+              {stock.category === 'thai' && totalSellAmountNum > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSellCommission(String(calcAutoSellCommission(totalSellAmountNum)))}
+                  className="px-3 py-2.5 rounded-2xl bg-slate-100 text-slate-600 text-xs font-semibold whitespace-nowrap active:bg-slate-200"
+                >
+                  คำนวณอัตโนมัติ
+                </button>
+              )}
+            </div>
+            {sellCommissionNum > 0 && proportionalBuyCommission > 0 && (
+              <p className="text-xs text-slate-400 mt-1">
+                + ค่าซื้อสัดส่วน {fmt(proportionalBuyCommission)} → รวมค่าธรรมเนียม {fmt(totalFees)}
+              </p>
+            )}
+            {sellCommissionNum === 0 && proportionalBuyCommission > 0 && (
+              <p className="text-xs text-slate-400 mt-1">
+                ค่าซื้อสัดส่วนที่คิด: {fmt(proportionalBuyCommission)}
+              </p>
+            )}
+          </div>
+
           {/* P/L Preview */}
           {sharesSold > 0 && !isOverSelling && costBasis > 0 && (
             <div className={`rounded-2xl p-4 border-2 ${isProfit ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">กำไร / ขาดทุนจากการขายครั้งนี้</p>
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
-                  <p className="text-xs text-slate-400 font-medium">ต้นทุนส่วนนี้</p>
-                  <p className="font-bold text-slate-800">{fmt(costBasis)}</p>
+                  <p className="text-xs text-slate-400 font-medium">ต้นทุน + ค่าซื้อ</p>
+                  <p className="font-bold text-slate-800">{fmt(netCost)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400 font-medium">รายรับ</p>
                   <p className="font-bold text-slate-800">{fmt(proceeds)}</p>
                 </div>
               </div>
-              <div className={`text-center font-black text-xl ${isProfit ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {isProfit ? '📈' : '📉'} {isProfit ? '+' : ''}{fmt(profit)}
-                {' '}({isProfit ? '+' : '-'}{Math.abs(profitPct).toFixed(2)}%)
-              </div>
-              {maxAmount !== undefined && (
-                <p className="text-center text-xs text-slate-400 mt-2">
-                  {sharesSold >= stock.shares - 0.0001 ? 'ขายทั้งหมด — รายการจะถูกลบออกจากพอร์ต' : `เหลือ ${(stock.shares - sharesSold).toFixed(4)} ${unitLabel} ในพอร์ต`}
-                </p>
+              {totalFees > 0 && (
+                <div className="text-center text-xs text-slate-400 mb-2">
+                  หักค่าธรรมเนียมรวม {fmt(totalFees)}
+                </div>
               )}
+              <div className={`text-center font-black text-xl ${isProfit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {isProfit ? '📈' : '📉'} {isProfit ? '+' : ''}{fmt(netProfit)}
+                {' '}({isProfit ? '+' : '-'}{Math.abs(netProfitPct).toFixed(2)}%)
+              </div>
+              <p className="text-center text-xs text-slate-400 mt-2">
+                {sharesSold >= stock.shares - 0.0001 ? 'ขายทั้งหมด — รายการจะถูกลบออกจากพอร์ต' : `เหลือ ${(stock.shares - sharesSold).toFixed(4)} ${unitLabel} ในพอร์ต`}
+              </p>
             </div>
           )}
 

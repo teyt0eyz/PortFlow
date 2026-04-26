@@ -11,7 +11,7 @@ const TAX_BRACKETS = [
   { upTo: Infinity, rate: 0.35 },
 ];
 
-function computeTax(netIncome: number): number {
+export function computeTax(netIncome: number): number {
   if (netIncome <= 0) return 0;
   let tax = 0;
   let prev = 0;

@@ -78,7 +78,7 @@ export default function HistoryPage() {
     se.sellCount++;
     se.sellProceeds += toCur(tx.proceeds, tx.category);
     se.sellCostBasis += toCur(tx.costBasis, tx.category);
-    se.sellProfit += toCur(tx.profit, tx.category);
+    se.sellProfit += toCur(tx.netProfit ?? tx.profit, tx.category);
   }
 
   const allYears = Array.from(yearMap.values()).sort((a, b) => b.year - a.year);
@@ -89,7 +89,7 @@ export default function HistoryPage() {
     return s + toCur(totalCost, st.category);
   }, 0) + sells.reduce((s, tx) => s + toCur(tx.costBasis, tx.category), 0);
 
-  const lifetimeRealized = sells.reduce((s, tx) => s + toCur(tx.profit, tx.category), 0);
+  const lifetimeRealized = sells.reduce((s, tx) => s + toCur(tx.netProfit ?? tx.profit, tx.category), 0);
   const lifetimeUnrealized = stocks.reduce((s, st) => {
     const { profitLoss } = calculateStockValue(st);
     return s + toCur(profitLoss, st.category);
@@ -248,7 +248,8 @@ export default function HistoryPage() {
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">รายการขายทั้งหมด</p>
             <div className="space-y-0">
               {[...sells].reverse().map((tx) => {
-                const isP = tx.profit >= 0;
+                const net = tx.netProfit ?? tx.profit;
+                const isP = net >= 0;
                 const f = (v: number) => fmt(toCur(v, tx.category), currency);
                 return (
                   <div key={tx.id} className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">
@@ -262,7 +263,7 @@ export default function HistoryPage() {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className={`font-bold text-sm ${isP ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {isP ? '+' : ''}{f(tx.profit)}
+                        {isP ? '+' : ''}{f(net)}
                       </p>
                       <p className="text-xs text-slate-400">รับ {f(tx.proceeds)}</p>
                     </div>

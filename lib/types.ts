@@ -8,6 +8,7 @@ export interface Stock {
   shares: number;
   currentPrice: number;
   note?: string;
+  buyCommission?: number;
 }
 
 export interface SellTransaction {
@@ -23,6 +24,8 @@ export interface SellTransaction {
   proceeds: number;
   costBasis: number;
   profit: number;
+  sellCommission?: number;
+  netProfit: number;
 }
 
 export interface TaxDeductions {

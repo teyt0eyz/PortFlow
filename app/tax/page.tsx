@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { TaxInputData, TaxDeductions } from '@/lib/types';
-import { calculateTax, formatTHB } from '@/lib/taxCalculation';
-import { getTaxData, saveTaxData } from '@/lib/storage';
+import { TaxInputData, TaxDeductions, SellTransaction } from '@/lib/types';
+import { calculateTax, computeTax, formatTHB } from '@/lib/taxCalculation';
+import { getTaxData, saveTaxData, getSellTransactions } from '@/lib/storage';
 
 const DEFAULT_DEDUCTIONS: TaxDeductions = {
   lifeInsurance: 0,
@@ -110,10 +110,13 @@ export default function TaxPage() {
   const [input, setInput] = useState<TaxInputData>(DEFAULT_INPUT);
   const [showBrackets, setShowBrackets] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [sells, setSells] = useState<SellTransaction[]>([]);
+  const [usGainsOverride, setUsGainsOverride] = useState('');
 
   useEffect(() => {
     const saved = getTaxData();
     if (saved) setInput(saved);
+    setSells(getSellTransactions());
     setMounted(true);
   }, []);
 
@@ -145,6 +148,22 @@ export default function TaxPage() {
 
   const result = calculateTax(input);
   const annualIncome = input.monthlyIncome * 12 + input.otherIncome;
+
+  // CGT calculations
+  const usSells = sells.filter((tx) => tx.category === 'us');
+  const thaiSells = sells.filter((tx) => tx.category === 'thai');
+  const fundSells = sells.filter((tx) => tx.category === 'fund');
+  const usRealizedGainsUSD = usSells.reduce((s, tx) => s + (tx.netProfit ?? tx.profit), 0);
+  const thaiRealizedGains = thaiSells.reduce((s, tx) => s + (tx.netProfit ?? tx.profit), 0);
+  const fundRealizedGains = fundSells.reduce((s, tx) => s + (tx.netProfit ?? tx.profit), 0);
+
+  // Default exchange rate for display (user can override the gains amount directly)
+  const defaultRate = 35;
+  const usGainsAutoTHB = usRealizedGainsUSD * defaultRate;
+  const usGainsTHB = usGainsOverride !== '' ? Number(usGainsOverride) : usGainsAutoTHB;
+
+  const cgtAdditional = usGainsTHB > 0 ? computeTax(result.netIncome + usGainsTHB) - result.taxAmount : 0;
+  const totalTaxWithCGT = result.taxAmount + cgtAdditional;
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #EEF2FF 0%, #F0F9FF 100%)' }}>
@@ -403,6 +422,119 @@ export default function TaxPage() {
               max={4}
             />
           </div>
+        </div>
+
+        {/* Capital Gains Tax Section */}
+        <div className="card">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-9 h-9 rounded-2xl flex items-center justify-center text-lg"
+                 style={{ background: 'linear-gradient(135deg, #7C3AED, #8B5CF6)' }}>
+              <span>📈</span>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">ภาษีจากกำไรหุ้น (CGT)</h2>
+              <p className="text-xs text-slate-400 mt-0.5">จากประวัติการขายในแอป</p>
+            </div>
+          </div>
+
+          {/* Thai SET — exempt */}
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 mb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🇹🇭</span>
+                <div>
+                  <p className="font-semibold text-emerald-800 text-sm">หุ้นไทย (SET)</p>
+                  <p className="text-xs text-emerald-600">ยกเว้นภาษี ม.42(7)</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className={`font-bold text-sm ${thaiRealizedGains >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                  {thaiSells.length > 0 ? `${thaiRealizedGains >= 0 ? '+' : ''}${formatTHB(thaiRealizedGains)}` : '—'}
+                </p>
+                <p className="text-xs text-emerald-500 font-semibold">ไม่ต้องเสียภาษี</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Thai Funds — exempt */}
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 mb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🏦</span>
+                <div>
+                  <p className="font-semibold text-emerald-800 text-sm">กองทุนรวม</p>
+                  <p className="text-xs text-emerald-600">กำไรจากขายคืนหน่วยลงทุน ยกเว้นภาษี</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className={`font-bold text-sm ${fundRealizedGains >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                  {fundSells.length > 0 ? `${fundRealizedGains >= 0 ? '+' : ''}${formatTHB(fundRealizedGains)}` : '—'}
+                </p>
+                <p className="text-xs text-emerald-500 font-semibold">ไม่ต้องเสียภาษี</p>
+              </div>
+            </div>
+          </div>
+
+          {/* US Stocks — taxable */}
+          <div className="bg-rose-50 border border-rose-100 rounded-2xl px-4 py-4 mb-3">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🇺🇸</span>
+                <div>
+                  <p className="font-semibold text-rose-800 text-sm">หุ้น US</p>
+                  <p className="text-xs text-rose-500">ต้องเสียภาษีหากนำเงินกลับไทย</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className={`font-bold text-sm ${usRealizedGainsUSD >= 0 ? 'text-rose-700' : 'text-slate-600'}`}>
+                  {usSells.length > 0 ? `${usRealizedGainsUSD >= 0 ? '+' : ''}$${usRealizedGainsUSD.toFixed(2)}` : '—'}
+                </p>
+                <p className="text-xs text-rose-400">≈ {formatTHB(usGainsAutoTHB)} (@{defaultRate})</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-rose-700 mb-1.5">กำไรที่นำเงินกลับไทยปีนี้ (บาท)</p>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-400 font-semibold text-sm">฿</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={usGainsOverride}
+                  onChange={(e) => setUsGainsOverride(e.target.value)}
+                  placeholder={usGainsAutoTHB > 0 ? usGainsAutoTHB.toFixed(0) : '0'}
+                  className="w-full border-2 border-rose-200 rounded-xl pl-7 pr-3 py-2.5 text-base font-semibold focus:outline-none focus:border-rose-400 bg-white"
+                />
+              </div>
+              <p className="text-xs text-rose-400 mt-1">ใส่จำนวนที่นำเงินเข้าไทยจริง (อิงกฎหมายปี 2567)</p>
+            </div>
+          </div>
+
+          {/* CGT Result */}
+          {usGainsTHB > 0 && (
+            <div className="bg-slate-800 rounded-2xl px-4 py-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">ผลกระทบต่อภาษีรวม</p>
+              <div className="space-y-2 mb-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-300">ภาษีเงินได้เดิม</span>
+                  <span className="text-white font-semibold">{formatTHB(result.taxAmount)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-300">ภาษีเพิ่มจากกำไร US</span>
+                  <span className="text-rose-400 font-semibold">+{formatTHB(cgtAdditional)}</span>
+                </div>
+                <div className="border-t border-slate-600 pt-2 flex justify-between">
+                  <span className="text-white font-bold">ภาษีรวมทั้งหมด</span>
+                  <span className="text-rose-300 font-black text-lg">{formatTHB(totalTaxWithCGT)}</span>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 text-center">คำนวณจากอัตราภาษีขอบ (Marginal Rate)</p>
+            </div>
+          )}
+
+          {sells.length === 0 && (
+            <p className="text-center text-slate-400 text-sm py-2">ยังไม่มีรายการขายในประวัติ</p>
+          )}
         </div>
 
         {/* Tax Brackets Reference */}

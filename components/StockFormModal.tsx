@@ -10,6 +10,14 @@ interface Props {
   onClose: () => void;
 }
 
+// Auto-calculate buy commission (Dime / Thai broker standard rates)
+function calcBuyCommission(tradeValue: number, category: 'us' | 'thai' | 'fund'): number {
+  if (category === 'us' || category === 'fund') return 0;
+  // Thai SET: 0.15% commission + 7% VAT, min ฿50 + VAT
+  const commission = Math.max(tradeValue * 0.0015, 50);
+  return Math.round(commission * 1.07);
+}
+
 async function fetchPrice(ticker: string, category: 'us' | 'thai' | 'fund') {
   const res = await fetch(`/api/stock-price?ticker=${encodeURIComponent(ticker)}&category=${category}`);
   const data = await res.json();
@@ -26,6 +34,7 @@ export default function StockFormModal({ initial, defaultCategory, onSave, onClo
     totalAmount: '',
     currentPrice: '',
     note: '',
+    buyCommission: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [fetching, setFetching] = useState(false);
@@ -43,6 +52,7 @@ export default function StockFormModal({ initial, defaultCategory, onSave, onClo
         totalAmount: String(initial.purchasePrice * initial.shares),
         currentPrice: String(initial.currentPrice),
         note: initial.note || '',
+        buyCommission: initial.buyCommission ? String(initial.buyCommission) : '',
       });
       setFetchedName(initial.name !== initial.ticker ? initial.name : '');
     }
@@ -86,6 +96,7 @@ export default function StockFormModal({ initial, defaultCategory, onSave, onClo
       shares: Number(form.purchasePrice) > 0 ? Number(form.totalAmount) / Number(form.purchasePrice) : 0,
       currentPrice: Number(form.currentPrice),
       note: form.note.trim() || undefined,
+      buyCommission: Number(form.buyCommission) || undefined,
     });
   }
 
@@ -97,7 +108,8 @@ export default function StockFormModal({ initial, defaultCategory, onSave, onClo
   const purchasePrice = Number(form.purchasePrice) || 0;
   const totalAmount = Number(form.totalAmount) || 0;
   const calculatedShares = purchasePrice > 0 ? totalAmount / purchasePrice : 0;
-  const totalCost = totalAmount;
+  const buyCommissionNum = Number(form.buyCommission) || 0;
+  const totalCost = totalAmount + buyCommissionNum;
   const currentValue = Number(form.currentPrice) * calculatedShares || 0;
   const profitLoss = currentValue - totalCost;
   const isProfit = profitLoss >= 0;
@@ -235,6 +247,31 @@ export default function StockFormModal({ initial, defaultCategory, onSave, onClo
               min="0" step="0.01"
               className={`input-field ${errors.currentPrice ? 'border-rose-400' : ''}`} />
             {errors.currentPrice && <p className="text-rose-500 text-sm mt-1">{errors.currentPrice}</p>}
+          </div>
+
+          {/* Buy Commission */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="label">ค่าธรรมเนียมซื้อ (ไม่บังคับ)</label>
+              {totalAmount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => set('buyCommission', String(calcBuyCommission(totalAmount, form.category)))}
+                  className="text-xs text-indigo-500 font-semibold active:opacity-60"
+                >
+                  คำนวณอัตโนมัติ
+                </button>
+              )}
+            </div>
+            <input type="number" inputMode="decimal"
+              value={form.buyCommission}
+              onChange={(e) => set('buyCommission', e.target.value)}
+              placeholder={form.category === 'us' || form.category === 'fund' ? '0 (ไม่มีค่าธรรมเนียม)' : 'เช่น 53'}
+              min="0" step="0.01"
+              className="input-field" />
+            <p className="text-xs text-slate-400 mt-1">
+              {form.category === 'thai' ? 'SET: 0.15% + VAT 7% (ขั้นต่ำ ฿53.50)' : form.category === 'us' ? 'หุ้นสหรัฐ: ฟรี' : 'กองทุน: ฟรี'}
+            </p>
           </div>
 
           {/* Note */}

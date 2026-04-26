@@ -87,7 +87,7 @@ export default function StockDetailPage() {
     </div>
   );
 
-  const { currentValue, profitLoss, profitLossPercent, totalCost } = calculateStockValue(stock);
+  const { currentValue, profitLoss, profitLossPercent, totalCost, tradeCost } = calculateStockValue(stock);
   const fmt = stock.category === 'us' ? formatUSD : formatTHB;
   const isProfit = profitLoss >= 0;
 
@@ -185,8 +185,16 @@ export default function StockDetailPage() {
           <InfoRow label={stock.category === 'fund' ? 'จำนวนหน่วย' : 'จำนวนหุ้น'}
             value={`${stock.shares % 1 === 0 ? stock.shares.toLocaleString('th-TH') : stock.shares.toFixed(4)} ${stock.category === 'fund' ? 'หน่วย' : 'หุ้น'}`} />
           <InfoRow label="ราคาซื้อ / หุ้น" value={fmt(stock.purchasePrice)} />
+          {stock.buyCommission != null && stock.buyCommission > 0 && (
+            <InfoRow label="ค่าคอมมิชชั่นซื้อ" value={fmt(stock.buyCommission)} />
+          )}
           <div className="mt-2 bg-indigo-50 rounded-2xl px-4 py-3 flex justify-between items-center">
-            <span className="text-indigo-700 font-semibold">ต้นทุนรวม</span>
+            <div>
+              <span className="text-indigo-700 font-semibold">ต้นทุนรวม</span>
+              {stock.buyCommission != null && stock.buyCommission > 0 && (
+                <p className="text-xs text-indigo-400">มูลค่าหุ้น {fmt(tradeCost)} + ค่าธรรมเนียม</p>
+              )}
+            </div>
             <span className="text-indigo-800 font-black text-xl">{fmt(totalCost)}</span>
           </div>
         </div>

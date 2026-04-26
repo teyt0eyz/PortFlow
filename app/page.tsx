@@ -9,6 +9,8 @@ import {
   Currency, getSavedCurrency, saveCurrency,
   getSavedRate, saveRate, getRateUpdatedAt, fetchLatestRate, convert, fmt,
 } from '@/lib/currency';
+import dynamic from 'next/dynamic';
+const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 
 export default function HomePage() {
   const [usStocks, setUsStocks] = useState<Stock[]>([]);
@@ -182,6 +184,15 @@ export default function HomePage() {
               {totalPL >= 0 ? '+' : ''}{totalPLPct.toFixed(2)}%
             </p>
           </div>
+        )}
+
+        {/* Portfolio chart */}
+        {hasStocks && (
+          <PortfolioChart
+            stocks={[...usStocks, ...thaiStocks, ...fundStocks]}
+            currency={currency}
+            rate={rate}
+          />
         )}
 
         {/* US Stocks Card */}

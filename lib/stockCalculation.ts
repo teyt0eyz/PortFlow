@@ -8,16 +8,18 @@ export interface StockSummary {
 }
 
 export function calculateStockValue(stock: Stock): {
+  tradeCost: number;
+  totalCost: number;
   currentValue: number;
   profitLoss: number;
   profitLossPercent: number;
-  totalCost: number;
 } {
-  const totalCost = stock.purchasePrice * stock.shares;
+  const tradeCost = stock.purchasePrice * stock.shares;
+  const totalCost = tradeCost + (stock.buyCommission ?? 0);
   const currentValue = stock.currentPrice * stock.shares;
   const profitLoss = currentValue - totalCost;
   const profitLossPercent = totalCost > 0 ? (profitLoss / totalCost) * 100 : 0;
-  return { totalCost, currentValue, profitLoss, profitLossPercent };
+  return { tradeCost, totalCost, currentValue, profitLoss, profitLossPercent };
 }
 
 export function summarizeStocks(stocks: Stock[]): StockSummary {
