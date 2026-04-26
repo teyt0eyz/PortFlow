@@ -1,0 +1,16 @@
+{
+  "name": "PortFlow - บันทึกหุ้น",
+  "short_name": "PortFlow",
+  "description": "ระบบจดบันทึกการลงทุนและคำนวณภาษีสำหรับคนไทย",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#EFF6FF",
+  "theme_color": "#2563EB",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
