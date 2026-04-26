@@ -5,212 +5,319 @@ import Link from 'next/link';
 import { getStocks } from '@/lib/storage';
 import { Stock } from '@/lib/types';
 import { summarizeStocks } from '@/lib/stockCalculation';
-import { formatTHB, formatUSD } from '@/lib/taxCalculation';
-
-function StatCard({
-  label,
-  value,
-  sub,
-  color,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  color: 'blue' | 'green' | 'red' | 'orange';
-}) {
-  const colors = {
-    blue: 'bg-blue-600',
-    green: 'bg-green-500',
-    red: 'bg-red-500',
-    orange: 'bg-orange-500',
-  };
-  return (
-    <div className={`${colors[color]} rounded-2xl p-4 text-white`}>
-      <p className="text-sm font-medium opacity-90">{label}</p>
-      <p className="text-2xl font-bold mt-1 leading-tight">{value}</p>
-      {sub && <p className="text-sm opacity-80 mt-1">{sub}</p>}
-    </div>
-  );
-}
+import {
+  Currency, getSavedCurrency, saveCurrency,
+  getSavedRate, saveRate, getRateUpdatedAt, fetchLatestRate, convert, fmt,
+} from '@/lib/currency';
 
 export default function HomePage() {
   const [usStocks, setUsStocks] = useState<Stock[]>([]);
   const [thaiStocks, setThaiStocks] = useState<Stock[]>([]);
+  const [fundStocks, setFundStocks] = useState<Stock[]>([]);
+  const [currency, setCurrency] = useState<Currency>('THB');
+  const [rate, setRate] = useState(35);
+  const [rateUpdatedAt, setRateUpdatedAt] = useState('');
+  const [fetchingRate, setFetchingRate] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const all = getStocks();
     setUsStocks(all.filter((s) => s.category === 'us'));
     setThaiStocks(all.filter((s) => s.category === 'thai'));
+    setFundStocks(all.filter((s) => s.category === 'fund'));
+    setCurrency(getSavedCurrency());
+    setRate(getSavedRate());
+    setRateUpdatedAt(getRateUpdatedAt());
     setMounted(true);
   }, []);
 
-  const usSummary = summarizeStocks(usStocks);
-  const thaiSummary = summarizeStocks(thaiStocks);
+  async function refreshRate() {
+    setFetchingRate(true);
+    try {
+      const r = await fetchLatestRate();
+      setRate(r);
+      saveRate(r);
+      setRateUpdatedAt(getRateUpdatedAt());
+    } catch { /* keep old rate */ }
+    setFetchingRate(false);
+  }
 
-  const totalStocks = usStocks.length + thaiStocks.length;
+  function toggleCurrency(c: Currency) {
+    setCurrency(c);
+    saveCurrency(c);
+  }
+
+  const usSummary   = summarizeStocks(usStocks);
+  const thaiSummary = summarizeStocks(thaiStocks);
+  const fundSummary = summarizeStocks(fundStocks);
+
+  const usCost    = convert(usSummary.totalCost,       'USD', currency, rate);
+  const usValue   = convert(usSummary.currentValue,    'USD', currency, rate);
+  const usPL      = convert(usSummary.profitLoss,      'USD', currency, rate);
+  const thaiCost  = convert(thaiSummary.totalCost,     'THB', currency, rate);
+  const thaiValue = convert(thaiSummary.currentValue,  'THB', currency, rate);
+  const thaiPL    = convert(thaiSummary.profitLoss,    'THB', currency, rate);
+  const fundCost  = convert(fundSummary.totalCost,     'THB', currency, rate);
+  const fundValue = convert(fundSummary.currentValue,  'THB', currency, rate);
+  const fundPL    = convert(fundSummary.profitLoss,    'THB', currency, rate);
+
+  const totalCost  = usCost + thaiCost + fundCost;
+  const totalValue = usValue + thaiValue + fundValue;
+  const totalPL    = usPL + thaiPL + fundPL;
+  const totalPLPct = totalCost > 0 ? (totalPL / totalCost) * 100 : 0;
+  const hasStocks  = usStocks.length + thaiStocks.length + fundStocks.length > 0;
 
   if (!mounted) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-blue-50">
-      {/* Header */}
-      <div className="bg-blue-600 text-white px-5 pt-12 pb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
-            <span className="text-blue-600 text-xl font-black">P</span>
+    <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #EEF2FF 0%, #F0F9FF 100%)' }}>
+
+      {/* ── Header ── */}
+      <div
+        className="px-5 pt-14 pb-8 relative overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, #4338CA 0%, #4F46E5 50%, #6366F1 100%)' }}
+      >
+        {/* decorative circles */}
+        <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full opacity-10"
+             style={{ background: 'radial-gradient(circle, #A5B4FC, transparent)' }} />
+        <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full opacity-10"
+             style={{ background: 'radial-gradient(circle, #C7D2FE, transparent)' }} />
+
+        {/* Logo row */}
+        <div className="flex items-center justify-between mb-6 relative">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-white/30">
+              <span className="text-white text-xl font-black">P</span>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white tracking-wide">PortFlow</h1>
+              <p className="text-indigo-200 text-xs font-medium">บันทึกการลงทุน</p>
+            </div>
           </div>
+
+          {/* Currency toggle */}
+          <div className="flex bg-white/15 rounded-2xl p-1 gap-1 backdrop-blur-sm border border-white/20">
+            {(['THB', 'USD'] as Currency[]).map((c) => (
+              <button
+                key={c}
+                onClick={() => toggleCurrency(c)}
+                className={`px-3 py-1.5 rounded-xl text-sm font-bold transition-all ${
+                  currency === c
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-white/80 active:bg-white/20'
+                }`}
+              >
+                {c === 'THB' ? '฿ THB' : '$ USD'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Big total P/L when has stocks */}
+        {hasStocks && (
+          <div className="relative mb-5">
+            <p className="text-indigo-200 text-sm font-medium mb-1">กำไร / ขาดทุนรวม</p>
+            <p className={`text-4xl font-black text-white`}>
+              {fmt(totalPL, currency, true)}
+            </p>
+            <p className={`text-base font-semibold mt-1 ${totalPL >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+              {totalPL >= 0 ? '▲' : '▼'} {Math.abs(totalPLPct).toFixed(2)}% จากต้นทุนทั้งหมด
+            </p>
+          </div>
+        )}
+
+        {/* Exchange Rate pill */}
+        <div className="flex items-center justify-between bg-white/15 rounded-2xl px-4 py-2.5 backdrop-blur-sm border border-white/20 relative">
           <div>
-            <h1 className="text-2xl font-bold">PortFlow</h1>
-            <p className="text-sm opacity-80">บันทึกการลงทุนของคุณ</p>
+            <p className="text-indigo-200 text-xs">อัตราแลกเปลี่ยน</p>
+            <p className="text-white font-bold text-base">1 USD = ฿{rate.toFixed(2)}</p>
+            {rateUpdatedAt && <p className="text-indigo-300 text-xs">{rateUpdatedAt}</p>}
+          </div>
+          <button
+            onClick={refreshRate}
+            disabled={fetchingRate}
+            className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-xl text-white text-sm font-semibold active:bg-white/10 transition-colors border border-white/20"
+          >
+            <svg className={`w-4 h-4 ${fetchingRate ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {fetchingRate ? '...' : 'อัปเดต'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Content ── */}
+      <div className="px-4 -mt-3 space-y-4 pb-6">
+
+        {/* Total Summary */}
+        {hasStocks && (
+          <div className="card">
+            <p className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-4">ภาพรวมพอร์ต</p>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              {[
+                { label: 'ลงทุนรวม', val: fmt(totalCost, currency), color: 'text-slate-800' },
+                { label: 'มูลค่าวันนี้', val: fmt(totalValue, currency), color: 'text-slate-800' },
+                { label: 'กำไร/ขาดทุน', val: fmt(totalPL, currency, true), color: totalPL >= 0 ? 'text-emerald-600' : 'text-rose-600' },
+              ].map((s) => (
+                <div key={s.label} className="text-center">
+                  <p className="text-xs text-slate-400 mb-1">{s.label}</p>
+                  <p className={`text-sm font-bold leading-tight ${s.color}`}>{s.val}</p>
+                </div>
+              ))}
+            </div>
+            {/* Progress bar */}
+            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-2 rounded-full transition-all ${totalPL >= 0 ? 'bg-emerald-400' : 'bg-rose-400'}`}
+                style={{ width: `${Math.min(100, Math.abs(totalPLPct))}%` }}
+              />
+            </div>
+            <p className={`text-xs mt-1 text-right font-semibold ${totalPL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+              {totalPL >= 0 ? '+' : ''}{totalPLPct.toFixed(2)}%
+            </p>
+          </div>
+        )}
+
+        {/* US Stocks Card */}
+        <PortfolioCard
+          flag="🇺🇸"
+          title="หุ้นสหรัฐ"
+          count={usStocks.length}
+          cost={usCost}
+          value={usValue}
+          pl={usPL}
+          plPct={usSummary.profitLossPercent}
+          currency={currency}
+          href="/stocks?tab=us"
+          accentColor="#4F46E5"
+        />
+
+        {/* Thai Stocks Card */}
+        <PortfolioCard
+          flag="🇹🇭"
+          title="หุ้นไทย"
+          count={thaiStocks.length}
+          cost={thaiCost}
+          value={thaiValue}
+          pl={thaiPL}
+          plPct={thaiSummary.profitLossPercent}
+          currency={currency}
+          href="/stocks?tab=thai"
+          accentColor="#0EA5E9"
+        />
+
+        {/* Fund Card */}
+        <PortfolioCard
+          flag="🏦"
+          title="กองทุนรวม"
+          count={fundStocks.length}
+          cost={fundCost}
+          value={fundValue}
+          pl={fundPL}
+          plPct={fundSummary.profitLossPercent}
+          currency={currency}
+          href="/stocks?tab=fund"
+          accentColor="#7C3AED"
+        />
+
+        {/* Tax Calculator Link */}
+        <Link href="/tax" className="card flex items-center gap-4 active:scale-[0.98] transition-transform">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+               style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-slate-800 text-lg">คำนวณภาษี</p>
+            <p className="text-slate-400 text-sm">ภาษีเงินได้บุคคลธรรมดา 2567</p>
+          </div>
+          <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center">
+            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function PortfolioCard({
+  flag, title, count, cost, value, pl, plPct, currency, href, accentColor,
+}: {
+  flag: string; title: string; count: number; cost: number; value: number;
+  pl: number; plPct: number; currency: Currency; href: string; accentColor: string;
+}) {
+  const isProfit = pl >= 0;
+
+  if (count === 0) {
+    return (
+      <div className="card">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-2xl">{flag}</span>
+          <h2 className="text-xl font-bold text-slate-800">{title}</h2>
+          <span className="ml-auto text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-full">0 ตัว</span>
+        </div>
+        <p className="text-slate-400 text-center py-2">ยังไม่มีหุ้น</p>
+        <Link href={href}
+          className="mt-3 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-base border-2 border-dashed border-slate-200 text-slate-400 active:bg-slate-50">
+          + เพิ่มหุ้น
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card">
+      <div className="flex items-center gap-3 mb-4">
+        <span className="text-2xl">{flag}</span>
+        <h2 className="text-xl font-bold text-slate-800">{title}</h2>
+        <span className="ml-auto text-xs font-bold px-2.5 py-1 rounded-full"
+              style={{ background: `${accentColor}18`, color: accentColor }}>
+          {count} ตัว
+        </span>
+      </div>
+
+      <div className="space-y-2.5 mb-4">
+        <div className="flex justify-between text-base">
+          <span className="text-slate-400">เงินที่ลงทุน</span>
+          <span className="font-semibold text-slate-700">{fmt(cost, currency)}</span>
+        </div>
+        <div className="flex justify-between text-base">
+          <span className="text-slate-400">มูลค่าปัจจุบัน</span>
+          <span className="font-semibold text-slate-700">{fmt(value, currency)}</span>
+        </div>
+        <div className="h-px bg-slate-100" />
+        <div className="flex justify-between items-center">
+          <span className="text-slate-400 text-base">กำไร / ขาดทุน</span>
+          <div className="text-right">
+            <span className={`text-xl font-black ${isProfit ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {fmt(pl, currency, true)}
+            </span>
+            <span className={`ml-2 text-sm font-bold px-2 py-0.5 rounded-full ${
+              isProfit ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'
+            }`}>
+              {isProfit ? '+' : ''}{plPct.toFixed(2)}%
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="px-4 -mt-4 space-y-4">
-        {/* Portfolio Overview */}
-        <div className="card">
-          <h2 className="text-lg font-bold text-gray-600 mb-3">ภาพรวมพอร์ต</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard
-              label="หุ้นสหรัฐทั้งหมด"
-              value={`${usStocks.length} ตัว`}
-              sub={usStocks.length > 0 ? (usSummary.profitLoss >= 0 ? `+${formatUSD(usSummary.profitLoss)}` : formatUSD(usSummary.profitLoss)) : undefined}
-              color={usSummary.profitLoss >= 0 ? 'blue' : 'orange'}
-            />
-            <StatCard
-              label="หุ้นไทยทั้งหมด"
-              value={`${thaiStocks.length} ตัว`}
-              sub={thaiStocks.length > 0 ? (thaiSummary.profitLoss >= 0 ? `+${formatTHB(thaiSummary.profitLoss)}` : formatTHB(thaiSummary.profitLoss)) : undefined}
-              color={thaiSummary.profitLoss >= 0 ? 'green' : 'red'}
-            />
-          </div>
-        </div>
-
-        {/* US Stocks Summary */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🇺🇸</span>
-              <h2 className="text-xl font-bold text-gray-800">หุ้นสหรัฐ</h2>
-            </div>
-            <span className="bg-blue-100 text-blue-700 text-sm font-bold px-3 py-1 rounded-full">
-              {usStocks.length} ตัว
-            </span>
-          </div>
-          {usStocks.length > 0 ? (
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-base">มูลค่าตลาด</span>
-                <span className="font-bold text-lg">{formatUSD(usSummary.currentValue)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-base">ต้นทุน</span>
-                <span className="font-semibold text-base">{formatUSD(usSummary.totalCost)}</span>
-              </div>
-              <div className="h-px bg-gray-100 my-2" />
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-base">กำไร/ขาดทุน</span>
-                <div className="flex items-center gap-2">
-                  <span className={`font-bold text-lg ${usSummary.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {usSummary.profitLoss >= 0 ? '+' : ''}{formatUSD(usSummary.profitLoss)}
-                  </span>
-                  <span className={`text-sm font-semibold px-2 py-0.5 rounded-full ${
-                    usSummary.profitLoss >= 0
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-700'
-                  }`}>
-                    {usSummary.profitLoss >= 0 ? '+' : ''}{usSummary.profitLossPercent.toFixed(2)}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p className="text-gray-400 text-center py-4">ยังไม่มีหุ้น</p>
-          )}
-          <Link href="/stocks?tab=us" className="mt-3 flex items-center justify-center gap-2 text-blue-600 font-semibold text-base py-2 border-2 border-blue-100 rounded-xl active:bg-blue-50">
-            <span>ดูทั้งหมด</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-        </div>
-
-        {/* Thai Stocks Summary */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🇹🇭</span>
-              <h2 className="text-xl font-bold text-gray-800">หุ้นไทย</h2>
-            </div>
-            <span className="bg-red-100 text-red-700 text-sm font-bold px-3 py-1 rounded-full">
-              {thaiStocks.length} ตัว
-            </span>
-          </div>
-          {thaiStocks.length > 0 ? (
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-base">มูลค่าตลาด</span>
-                <span className="font-bold text-lg">{formatTHB(thaiSummary.currentValue)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-base">ต้นทุน</span>
-                <span className="font-semibold text-base">{formatTHB(thaiSummary.totalCost)}</span>
-              </div>
-              <div className="h-px bg-gray-100 my-2" />
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-base">กำไร/ขาดทุน</span>
-                <div className="flex items-center gap-2">
-                  <span className={`font-bold text-lg ${thaiSummary.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {thaiSummary.profitLoss >= 0 ? '+' : ''}{formatTHB(thaiSummary.profitLoss)}
-                  </span>
-                  <span className={`text-sm font-semibold px-2 py-0.5 rounded-full ${
-                    thaiSummary.profitLoss >= 0
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-700'
-                  }`}>
-                    {thaiSummary.profitLoss >= 0 ? '+' : ''}{thaiSummary.profitLossPercent.toFixed(2)}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p className="text-gray-400 text-center py-4">ยังไม่มีหุ้น</p>
-          )}
-          <Link href="/stocks?tab=thai" className="mt-3 flex items-center justify-center gap-2 text-blue-600 font-semibold text-base py-2 border-2 border-blue-100 rounded-xl active:bg-blue-50">
-            <span>ดูทั้งหมด</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-3 pb-4">
-          <Link href="/stocks" className="card flex flex-col items-center justify-center py-5 gap-2 active:bg-blue-50 transition-colors">
-            <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-              </svg>
-            </div>
-            <span className="font-bold text-gray-700 text-base">เพิ่มหุ้น</span>
-          </Link>
-          <Link href="/tax" className="card flex flex-col items-center justify-center py-5 gap-2 active:bg-green-50 transition-colors">
-            <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <span className="font-bold text-gray-700 text-base">คำนวณภาษี</span>
-          </Link>
-        </div>
-      </div>
+      <Link href={href}
+        className="flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-colors active:opacity-70"
+        style={{ background: `${accentColor}12`, color: accentColor }}>
+        ดูรายการหุ้นทั้งหมด
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </Link>
     </div>
   );
 }

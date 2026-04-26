@@ -6,77 +6,74 @@
 
 @layer base {
   html {
-    font-size: 18px;
+    font-size: 17px;
     -webkit-tap-highlight-color: transparent;
   }
-
   body {
-    @apply bg-blue-50 text-gray-800;
     font-family: 'Sarabun', sans-serif;
+    background: #EEF2FF;
+    color: #0F172A;
+    min-height: 100svh;
   }
-
-  * {
-    box-sizing: border-box;
-  }
+  * { box-sizing: border-box; }
 }
 
 @layer components {
-  .btn-primary {
-    @apply bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl text-lg
-           active:bg-blue-700 transition-colors shadow-md;
-  }
-
-  .btn-secondary {
-    @apply bg-white text-blue-600 font-semibold py-3 px-6 rounded-xl text-lg
-           border-2 border-blue-600 active:bg-blue-50 transition-colors;
-  }
-
-  .btn-danger {
-    @apply bg-red-500 text-white font-semibold py-2 px-4 rounded-xl text-base
-           active:bg-red-600 transition-colors;
-  }
-
+  /* Cards */
   .card {
-    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-4;
+    @apply bg-white rounded-3xl p-5;
+    box-shadow: 0 2px 16px rgba(79,70,229,0.06), 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .card-glass {
+    background: rgba(255,255,255,0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    @apply rounded-3xl p-5 border border-white/70;
   }
 
+  /* Buttons */
+  .btn-primary {
+    @apply bg-indigo-600 text-white font-bold py-3.5 px-6 rounded-2xl text-lg
+           active:opacity-80 transition-opacity shadow-lg;
+    box-shadow: 0 4px 14px rgba(79,70,229,0.35);
+  }
+  .btn-secondary {
+    @apply bg-white text-indigo-600 font-bold py-3.5 px-6 rounded-2xl text-lg
+           border-2 border-indigo-200 active:bg-indigo-50 transition-colors;
+  }
+
+  /* Inputs */
   .input-field {
-    @apply w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-lg
-           focus:outline-none focus:border-blue-500 transition-colors
-           bg-white;
+    @apply w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-lg
+           focus:outline-none focus:border-indigo-400 transition-colors bg-slate-50/60;
   }
-
   .label {
-    @apply block text-base font-semibold text-gray-600 mb-1;
+    @apply block text-sm font-semibold text-slate-500 mb-1.5 tracking-wide uppercase;
   }
 
-  .profit-badge {
-    @apply bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full text-base;
+  /* Tags */
+  .tag-profit {
+    @apply bg-emerald-100 text-emerald-700 font-bold px-3 py-1 rounded-full text-sm;
+  }
+  .tag-loss {
+    @apply bg-rose-100 text-rose-600 font-bold px-3 py-1 rounded-full text-sm;
   }
 
-  .loss-badge {
-    @apply bg-red-100 text-red-700 font-bold px-3 py-1 rounded-full text-base;
-  }
-
+  /* Section title */
   .section-title {
-    @apply text-2xl font-bold text-gray-800 mb-4;
-  }
-
-  .page-header {
-    @apply bg-white shadow-sm px-4 py-4 flex items-center gap-3 sticky top-0 z-10;
+    @apply text-xl font-bold text-slate-800 mb-4;
   }
 }
 
-/* Hide scrollbar but allow scrolling */
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
+/* Gradient text */
+.text-gradient {
+  background: linear-gradient(135deg, #4F46E5, #818CF8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* Safe area for bottom nav */
+/* Safe area bottom padding */
 .pb-safe {
-  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
 }

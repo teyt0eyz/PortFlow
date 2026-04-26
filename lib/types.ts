@@ -2,12 +2,27 @@ export interface Stock {
   id: string;
   name: string;
   ticker: string;
-  category: 'us' | 'thai';
+  category: 'us' | 'thai' | 'fund';
   purchaseDate: string;
   purchasePrice: number;
   shares: number;
   currentPrice: number;
   note?: string;
+}
+
+export interface SellTransaction {
+  id: string;
+  ticker: string;
+  name: string;
+  category: 'us' | 'thai' | 'fund';
+  purchaseDate: string;
+  purchasePrice: number;
+  sellDate: string;
+  sellPrice: number;
+  sharesSold: number;
+  proceeds: number;
+  costBasis: number;
+  profit: number;
 }
 
 export interface TaxDeductions {

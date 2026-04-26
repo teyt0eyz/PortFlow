@@ -1,9 +1,10 @@
 'use client';
 
-import { Stock, TaxInputData } from './types';
+import { Stock, TaxInputData, SellTransaction } from './types';
 
 const STOCKS_KEY = 'portflow_stocks';
 const TAX_KEY = 'portflow_tax';
+const SELLS_KEY = 'portflow_sells';
 
 export function getStocks(): Stock[] {
   if (typeof window === 'undefined') return [];
@@ -53,6 +54,29 @@ export function getTaxData(): TaxInputData | null {
 export function saveTaxData(data: TaxInputData): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(TAX_KEY, JSON.stringify(data));
+}
+
+export function getSellTransactions(): SellTransaction[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const data = localStorage.getItem(SELLS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function addSellTransaction(tx: SellTransaction): void {
+  if (typeof window === 'undefined') return;
+  const txs = getSellTransactions();
+  txs.push(tx);
+  localStorage.setItem(SELLS_KEY, JSON.stringify(txs));
+}
+
+export function deleteSellTransaction(id: string): void {
+  if (typeof window === 'undefined') return;
+  const txs = getSellTransactions().filter((t) => t.id !== id);
+  localStorage.setItem(SELLS_KEY, JSON.stringify(txs));
 }
 
 export function generateId(): string {

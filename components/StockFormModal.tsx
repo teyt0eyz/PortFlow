@@ -5,65 +5,85 @@ import { Stock } from '@/lib/types';
 
 interface Props {
   initial: Stock | null;
-  defaultCategory: 'us' | 'thai';
+  defaultCategory: 'us' | 'thai' | 'fund';
   onSave: (data: Omit<Stock, 'id'>) => void;
   onClose: () => void;
 }
 
-const DEFAULT_FORM = {
-  name: '',
-  ticker: '',
-  category: 'us' as 'us' | 'thai',
-  purchaseDate: new Date().toISOString().split('T')[0],
-  purchasePrice: '',
-  shares: '',
-  currentPrice: '',
-  note: '',
-};
+async function fetchPrice(ticker: string, category: 'us' | 'thai' | 'fund') {
+  const res = await fetch(`/api/stock-price?ticker=${encodeURIComponent(ticker)}&category=${category}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'ดึงราคาไม่ได้');
+  return data as { price: number; shortName: string };
+}
 
 export default function StockFormModal({ initial, defaultCategory, onSave, onClose }: Props) {
-  const [form, setForm] = useState({ ...DEFAULT_FORM, category: defaultCategory });
+  const [form, setForm] = useState({
+    ticker: '',
+    category: defaultCategory as 'us' | 'thai' | 'fund',
+    purchaseDate: new Date().toISOString().split('T')[0],
+    purchasePrice: '',
+    totalAmount: '',
+    currentPrice: '',
+    note: '',
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+  const [lastFetched, setLastFetched] = useState('');
+  const [fetchedName, setFetchedName] = useState('');
 
   useEffect(() => {
     if (initial) {
       setForm({
-        name: initial.name,
         ticker: initial.ticker,
         category: initial.category,
         purchaseDate: initial.purchaseDate,
         purchasePrice: String(initial.purchasePrice),
-        shares: String(initial.shares),
+        totalAmount: String(initial.purchasePrice * initial.shares),
         currentPrice: String(initial.currentPrice),
         note: initial.note || '',
       });
+      setFetchedName(initial.name !== initial.ticker ? initial.name : '');
     }
   }, [initial]);
+
+  async function handleFetchPrice() {
+    if (!form.ticker.trim()) { setFetchError('กรุณาใส่ชื่อย่อหุ้นก่อน'); return; }
+    setFetching(true); setFetchError('');
+    try {
+      const result = await fetchPrice(form.ticker.trim(), form.category);
+      set('currentPrice', String(result.price));
+      setFetchedName(result.shortName);
+      setLastFetched(new Date().toLocaleTimeString('th-TH'));
+      setErrors((e) => { const n = { ...e }; delete n['currentPrice']; return n; });
+    } catch (err: unknown) {
+      setFetchError(err instanceof Error ? err.message : 'ดึงราคาไม่ได้');
+    }
+    setFetching(false);
+  }
 
   function validate() {
     const e: Record<string, string> = {};
     if (!form.ticker.trim()) e.ticker = 'กรุณาใส่ชื่อย่อหุ้น';
-    if (!form.name.trim()) e.name = 'กรุณาใส่ชื่อเต็มหุ้น';
     if (!form.purchaseDate) e.purchaseDate = 'กรุณาเลือกวันที่ซื้อ';
     if (!form.purchasePrice || Number(form.purchasePrice) <= 0) e.purchasePrice = 'ราคาซื้อต้องมากกว่า 0';
-    if (!form.shares || Number(form.shares) <= 0) e.shares = 'จำนวนหุ้นต้องมากกว่า 0';
-    if (!form.currentPrice || Number(form.currentPrice) <= 0) e.currentPrice = 'ราคาปัจจุบันต้องมากกว่า 0';
+    if (!form.totalAmount || Number(form.totalAmount) <= 0) e.totalAmount = 'จำนวนเงินต้องมากกว่า 0';
+    if (!form.currentPrice || Number(form.currentPrice) <= 0) e.currentPrice = 'กรุณาดึงราคาหรือกรอกเอง';
     return e;
   }
 
   function handleSubmit() {
     const e = validate();
-    if (Object.keys(e).length > 0) {
-      setErrors(e);
-      return;
-    }
+    if (Object.keys(e).length > 0) { setErrors(e); return; }
+    const ticker = form.ticker.trim().toUpperCase();
     onSave({
-      name: form.name.trim(),
-      ticker: form.ticker.trim().toUpperCase(),
+      name: fetchedName || ticker,
+      ticker,
       category: form.category,
       purchaseDate: form.purchaseDate,
       purchasePrice: Number(form.purchasePrice),
-      shares: Number(form.shares),
+      shares: Number(form.purchasePrice) > 0 ? Number(form.totalAmount) / Number(form.purchasePrice) : 0,
       currentPrice: Number(form.currentPrice),
       note: form.note.trim() || undefined,
     });
@@ -74,203 +94,189 @@ export default function StockFormModal({ initial, defaultCategory, onSave, onClo
     setErrors((e) => { const n = { ...e }; delete n[key]; return n; });
   }
 
-  const totalCost = Number(form.purchasePrice) * Number(form.shares) || 0;
-  const currentValue = Number(form.currentPrice) * Number(form.shares) || 0;
+  const purchasePrice = Number(form.purchasePrice) || 0;
+  const totalAmount = Number(form.totalAmount) || 0;
+  const calculatedShares = purchasePrice > 0 ? totalAmount / purchasePrice : 0;
+  const totalCost = totalAmount;
+  const currentValue = Number(form.currentPrice) * calculatedShares || 0;
   const profitLoss = currentValue - totalCost;
+  const isProfit = profitLoss >= 0;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-end">
-      <div className="bg-white rounded-t-3xl w-full max-h-[92vh] overflow-y-auto pb-8">
+    <div className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}>
+      <div className="bg-white rounded-t-3xl w-full max-h-[92vh] overflow-y-auto pb-8"
+           style={{ boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}>
+
         {/* Handle */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+        <div className="flex justify-center pt-3 pb-4">
+          <div className="w-10 h-1 bg-slate-200 rounded-full" />
         </div>
 
         {/* Title */}
-        <div className="flex items-center justify-between px-5 mb-5">
-          <h2 className="text-2xl font-bold text-gray-800">
+        <div className="flex items-center justify-between px-5 mb-6">
+          <h2 className="text-2xl font-bold text-slate-800">
             {initial ? 'แก้ไขหุ้น' : 'เพิ่มหุ้นใหม่'}
           </h2>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center active:bg-gray-200"
-          >
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={onClose}
+            className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center active:bg-slate-200">
+            <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <div className="px-5 space-y-4">
+        <div className="px-5 space-y-5">
           {/* Category */}
           <div>
-            <label className="label">ประเภทหุ้น</label>
-            <div className="flex gap-3">
-              <button
-                onClick={() => set('category', 'us')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-lg border-2 transition-colors
-                  ${form.category === 'us' ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 text-gray-500'}`}
-              >
-                🇺🇸 สหรัฐ
-              </button>
-              <button
-                onClick={() => set('category', 'thai')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-lg border-2 transition-colors
-                  ${form.category === 'thai' ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 text-gray-500'}`}
-              >
-                🇹🇭 ไทย
-              </button>
+            <label className="label">ประเภท</label>
+            <div className="flex gap-1.5 p-1 bg-slate-100 rounded-2xl">
+              {(['us', 'thai', 'fund'] as const).map((cat) => (
+                <button key={cat}
+                  onClick={() => { set('category', cat); setFetchError(''); setLastFetched(''); setFetchedName(''); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                    form.category === cat
+                      ? 'bg-white text-indigo-600 shadow-sm'
+                      : 'text-slate-400'
+                  }`}>
+                  {cat === 'us' ? '🇺🇸 สหรัฐ' : cat === 'thai' ? '🇹🇭 ไทย' : '🏦 กองทุน'}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Ticker */}
           <div>
-            <label className="label">ชื่อย่อหุ้น (Ticker) *</label>
-            <input
-              type="text"
+            <label className="label">{form.category === 'fund' ? 'รหัสกองทุน' : 'ชื่อย่อหุ้น (Ticker)'}</label>
+            <input type="text"
               value={form.ticker}
-              onChange={(e) => set('ticker', e.target.value)}
-              placeholder={form.category === 'us' ? 'เช่น AAPL, NVDA, TSLA' : 'เช่น PTT, ADVANC, SCB'}
-              className={`input-field ${errors.ticker ? 'border-red-400' : ''}`}
+              onChange={(e) => { set('ticker', e.target.value); setLastFetched(''); setFetchedName(''); }}
+              placeholder={form.category === 'us' ? 'เช่น AAPL, NVDA, TSLA' : form.category === 'thai' ? 'เช่น PTT, ADVANC, SCB' : 'เช่น KFSDIV, TMBUSB'}
+              className={`input-field uppercase ${errors.ticker ? 'border-rose-400' : ''}`}
             />
-            {errors.ticker && <p className="text-red-500 text-sm mt-1">{errors.ticker}</p>}
-          </div>
-
-          {/* Name */}
-          <div>
-            <label className="label">ชื่อเต็มบริษัท *</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => set('name', e.target.value)}
-              placeholder={form.category === 'us' ? 'เช่น Apple Inc.' : 'เช่น บริษัท ปตท. จำกัด'}
-              className={`input-field ${errors.name ? 'border-red-400' : ''}`}
-            />
-            {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+            {errors.ticker && <p className="text-rose-500 text-sm mt-1">{errors.ticker}</p>}
+            {fetchedName && <p className="text-emerald-600 text-sm mt-1 font-medium">✓ {fetchedName}</p>}
           </div>
 
           {/* Purchase Date */}
           <div>
-            <label className="label">วันที่ซื้อ *</label>
-            <input
-              type="date"
-              value={form.purchaseDate}
+            <label className="label">วันที่ซื้อ</label>
+            <input type="date" value={form.purchaseDate}
               onChange={(e) => set('purchaseDate', e.target.value)}
-              className={`input-field ${errors.purchaseDate ? 'border-red-400' : ''}`}
-            />
-            {errors.purchaseDate && <p className="text-red-500 text-sm mt-1">{errors.purchaseDate}</p>}
+              className={`input-field ${errors.purchaseDate ? 'border-rose-400' : ''}`} />
+            {errors.purchaseDate && <p className="text-rose-500 text-sm mt-1">{errors.purchaseDate}</p>}
           </div>
 
-          {/* Purchase Price */}
-          <div>
-            <label className="label">
-              ราคาซื้อต่อหุ้น * ({form.category === 'us' ? 'USD' : 'บาท'})
-            </label>
-            <input
-              type="number"
-              inputMode="decimal"
-              value={form.purchasePrice}
-              onChange={(e) => set('purchasePrice', e.target.value)}
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-              className={`input-field ${errors.purchasePrice ? 'border-red-400' : ''}`}
-            />
-            {errors.purchasePrice && <p className="text-red-500 text-sm mt-1">{errors.purchasePrice}</p>}
-          </div>
-
-          {/* Shares */}
-          <div>
-            <label className="label">จำนวนหุ้น *</label>
-            <input
-              type="number"
-              inputMode="decimal"
-              value={form.shares}
-              onChange={(e) => set('shares', e.target.value)}
-              placeholder="0"
-              min="0"
-              step="1"
-              className={`input-field ${errors.shares ? 'border-red-400' : ''}`}
-            />
-            {errors.shares && <p className="text-red-500 text-sm mt-1">{errors.shares}</p>}
+          {/* Purchase Price + Total Amount side by side */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">{form.category === 'fund' ? 'ราคาซื้อ/หน่วย (฿)' : `ราคาซื้อ/หุ้น (${form.category === 'us' ? '$' : '฿'})`}</label>
+              <input type="number" inputMode="decimal"
+                value={form.purchasePrice}
+                onChange={(e) => set('purchasePrice', e.target.value)}
+                placeholder="0.00" min="0" step="0.01"
+                className={`input-field ${errors.purchasePrice ? 'border-rose-400' : ''}`} />
+              {errors.purchasePrice && <p className="text-rose-500 text-xs mt-1">{errors.purchasePrice}</p>}
+            </div>
+            <div>
+              <label className="label">จำนวนเงินที่ลงทุน ({form.category === 'us' ? '$' : '฿'})</label>
+              <input type="number" inputMode="decimal"
+                value={form.totalAmount}
+                onChange={(e) => set('totalAmount', e.target.value)}
+                placeholder="0.00" min="0" step="0.01"
+                className={`input-field ${errors.totalAmount ? 'border-rose-400' : ''}`} />
+              {errors.totalAmount && <p className="text-rose-500 text-xs mt-1">{errors.totalAmount}</p>}
+              {calculatedShares > 0 && !errors.totalAmount && (
+                <p className="text-indigo-500 text-xs mt-1 font-medium">
+                  = {calculatedShares % 1 === 0
+                      ? calculatedShares.toLocaleString('th-TH')
+                      : calculatedShares.toFixed(4)} หุ้น
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Current Price */}
           <div>
-            <label className="label">
-              ราคาปัจจุบันต่อหุ้น * ({form.category === 'us' ? 'USD' : 'บาท'})
-            </label>
-            <input
-              type="number"
-              inputMode="decimal"
+            <label className="label">{form.category === 'fund' ? 'NAV ปัจจุบัน/หน่วย (฿)' : `ราคาปัจจุบัน/หุ้น (${form.category === 'us' ? '$' : '฿'})`}</label>
+            <button
+              onClick={handleFetchPrice}
+              disabled={fetching || !form.ticker.trim()}
+              className={`w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-base mb-2 transition-all border-2 ${
+                fetching || !form.ticker.trim()
+                  ? 'border-slate-200 text-slate-300 bg-slate-50'
+                  : 'border-indigo-300 text-indigo-600 bg-indigo-50 active:bg-indigo-100'
+              }`}
+            >
+              {fetching ? (
+                <><div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" /> กำลังดึงราคา...</>
+              ) : (
+                <><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg> ดึงราคาอัตโนมัติ</>
+              )}
+            </button>
+
+            {fetchError && (
+              <div className="flex items-center gap-2 text-rose-600 text-sm mb-2 bg-rose-50 rounded-xl px-3 py-2">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                {fetchError}
+              </div>
+            )}
+            {lastFetched && !fetchError && (
+              <p className="text-emerald-600 text-sm mb-2">✓ อัปเดตเวลา {lastFetched}</p>
+            )}
+
+            <input type="number" inputMode="decimal"
               value={form.currentPrice}
               onChange={(e) => set('currentPrice', e.target.value)}
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-              className={`input-field ${errors.currentPrice ? 'border-red-400' : ''}`}
-            />
-            {errors.currentPrice && <p className="text-red-500 text-sm mt-1">{errors.currentPrice}</p>}
+              placeholder="หรือพิมพ์เองได้"
+              min="0" step="0.01"
+              className={`input-field ${errors.currentPrice ? 'border-rose-400' : ''}`} />
+            {errors.currentPrice && <p className="text-rose-500 text-sm mt-1">{errors.currentPrice}</p>}
           </div>
 
           {/* Note */}
           <div>
             <label className="label">หมายเหตุ (ไม่บังคับ)</label>
-            <input
-              type="text"
-              value={form.note}
+            <input type="text" value={form.note}
               onChange={(e) => set('note', e.target.value)}
               placeholder="บันทึกเพิ่มเติม..."
-              className="input-field"
-            />
+              className="input-field" />
           </div>
 
-          {/* Live Preview */}
-          {totalCost > 0 && (
-            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-              <p className="text-sm font-semibold text-blue-700 mb-2">ตัวอย่างผลลัพธ์</p>
-              <div className="grid grid-cols-2 gap-2 text-sm">
+          {/* Preview */}
+          {totalCost > 0 && currentValue > 0 && (
+            <div className={`rounded-2xl p-4 border-2 ${isProfit ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
+              <div className="grid grid-cols-2 gap-3 mb-2">
                 <div>
-                  <p className="text-gray-400">ต้นทุนรวม</p>
-                  <p className="font-bold text-base text-gray-800">
-                    {form.category === 'us'
-                      ? `$${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                      : `฿${totalCost.toLocaleString('th-TH')}`
-                    }
+                  <p className="text-xs text-slate-400 font-medium">ต้นทุนรวม</p>
+                  <p className="font-bold text-slate-800 text-base">
+                    {form.category === 'us' ? `$${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : `฿${totalCost.toLocaleString('th-TH')}`}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-400">มูลค่าปัจจุบัน</p>
-                  <p className="font-bold text-base text-gray-800">
-                    {form.category === 'us'
-                      ? `$${currentValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                      : `฿${currentValue.toLocaleString('th-TH')}`
-                    }
+                  <p className="text-xs text-slate-400 font-medium">มูลค่าปัจจุบัน</p>
+                  <p className="font-bold text-slate-800 text-base">
+                    {form.category === 'us' ? `$${currentValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : `฿${currentValue.toLocaleString('th-TH')}`}
                   </p>
                 </div>
               </div>
-              {currentValue > 0 && (
-                <div className={`mt-2 text-center font-bold text-lg ${profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {profitLoss >= 0 ? '📈 กำไร ' : '📉 ขาดทุน '}
-                  {form.category === 'us'
-                    ? `$${Math.abs(profitLoss).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                    : `฿${Math.abs(profitLoss).toLocaleString('th-TH')}`
-                  }
-                  {' '}
-                  ({profitLoss >= 0 ? '+' : '-'}{totalCost > 0 ? (Math.abs(profitLoss / totalCost) * 100).toFixed(2) : '0'}%)
-                </div>
-              )}
+              <div className={`text-center font-black text-xl ${isProfit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {isProfit ? '📈' : '📉'} {isProfit ? '+' : ''}{form.category === 'us'
+                  ? `$${Math.abs(profitLoss).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                  : `฿${Math.abs(profitLoss).toLocaleString('th-TH')}`
+                }
+                {' '}({isProfit ? '+' : '-'}{totalCost > 0 ? (Math.abs(profitLoss / totalCost) * 100).toFixed(2) : '0'}%)
+              </div>
             </div>
           )}
 
           {/* Buttons */}
-          <div className="flex gap-3 pt-2">
-            <button onClick={onClose} className="flex-1 btn-secondary">
-              ยกเลิก
-            </button>
-            <button onClick={handleSubmit} className="flex-1 btn-primary">
-              {initial ? 'บันทึก' : 'เพิ่มหุ้น'}
-            </button>
+          <div className="flex gap-3 pt-1">
+            <button onClick={onClose} className="flex-1 btn-secondary">ยกเลิก</button>
+            <button onClick={handleSubmit} className="flex-1 btn-primary">{initial ? 'บันทึก' : 'เพิ่มหุ้น'}</button>
           </div>
         </div>
       </div>

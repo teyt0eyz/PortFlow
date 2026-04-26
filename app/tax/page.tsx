@@ -43,40 +43,40 @@ function DeductionRow({
   max?: number;
 }) {
   return (
-    <div className="py-3 border-b border-gray-100 last:border-0">
+    <div className="py-3.5 border-b border-slate-100 last:border-0">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <p className="font-semibold text-gray-700">{label}</p>
-          {sub && <p className="text-sm text-gray-400 mt-0.5">{sub}</p>}
-          {cap && <p className="text-sm text-blue-500 font-medium mt-0.5">{cap}</p>}
+          <p className="font-semibold text-slate-700 text-base">{label}</p>
+          {sub && <p className="text-sm text-slate-400 mt-0.5 leading-snug">{sub}</p>}
+          {cap && <p className="text-sm text-indigo-500 font-medium mt-0.5">{cap}</p>}
         </div>
-        <div className="w-36">
+        <div className="w-36 flex-shrink-0">
           {type === 'count' ? (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onChange(Math.max(0, value - 1))}
-                className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-xl font-bold active:bg-gray-200"
+                className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-xl font-bold text-slate-600 active:bg-slate-200"
               >
                 −
               </button>
-              <span className="w-8 text-center text-xl font-bold">{value}</span>
+              <span className="w-8 text-center text-xl font-bold text-slate-800">{value}</span>
               <button
                 onClick={() => onChange(max !== undefined ? Math.min(max, value + 1) : value + 1)}
-                className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-xl font-bold text-blue-600 active:bg-blue-200"
+                className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-xl font-bold text-indigo-600 active:bg-indigo-200"
               >
                 +
               </button>
             </div>
           ) : (
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">฿</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold">฿</span>
               <input
                 type="number"
                 inputMode="numeric"
                 value={value || ''}
                 onChange={(e) => onChange(Number(e.target.value) || 0)}
                 placeholder="0"
-                className="w-full border-2 border-gray-200 rounded-xl pl-7 pr-2 py-2 text-right text-base font-semibold focus:outline-none focus:border-blue-500 bg-white"
+                className="w-full border-2 border-slate-200 rounded-xl pl-7 pr-2 py-2.5 text-right text-base font-semibold focus:outline-none focus:border-indigo-400 bg-slate-50"
               />
             </div>
           )}
@@ -89,21 +89,21 @@ function DeductionRow({
 function ResultRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className={`flex justify-between items-center py-2 ${highlight ? 'font-bold' : ''}`}>
-      <span className={`${highlight ? 'text-gray-800 font-bold text-base' : 'text-gray-500 text-sm'}`}>{label}</span>
-      <span className={`${highlight ? 'text-gray-800 text-base' : 'text-gray-600 text-sm'}`}>{value}</span>
+      <span className={highlight ? 'text-slate-800 font-bold text-base' : 'text-slate-500 text-sm'}>{label}</span>
+      <span className={highlight ? 'text-slate-800 text-base' : 'text-slate-600 text-sm'}>{value}</span>
     </div>
   );
 }
 
 const TAX_BRACKETS = [
-  { range: '1 - 150,000', rate: '0%', color: 'bg-green-100 text-green-700' },
-  { range: '150,001 - 300,000', rate: '5%', color: 'bg-yellow-100 text-yellow-700' },
-  { range: '300,001 - 500,000', rate: '10%', color: 'bg-orange-100 text-orange-700' },
-  { range: '500,001 - 750,000', rate: '15%', color: 'bg-orange-100 text-orange-700' },
-  { range: '750,001 - 1,000,000', rate: '20%', color: 'bg-red-100 text-red-600' },
-  { range: '1,000,001 - 2,000,000', rate: '25%', color: 'bg-red-100 text-red-600' },
-  { range: '2,000,001 - 5,000,000', rate: '30%', color: 'bg-red-200 text-red-700' },
-  { range: '5,000,001 ขึ้นไป', rate: '35%', color: 'bg-red-200 text-red-700' },
+  { range: '1 – 150,000', rate: '0%', color: 'bg-emerald-100 text-emerald-700' },
+  { range: '150,001 – 300,000', rate: '5%', color: 'bg-yellow-100 text-yellow-700' },
+  { range: '300,001 – 500,000', rate: '10%', color: 'bg-orange-100 text-orange-700' },
+  { range: '500,001 – 750,000', rate: '15%', color: 'bg-orange-100 text-orange-700' },
+  { range: '750,001 – 1,000,000', rate: '20%', color: 'bg-rose-100 text-rose-600' },
+  { range: '1,000,001 – 2,000,000', rate: '25%', color: 'bg-rose-100 text-rose-600' },
+  { range: '2,000,001 – 5,000,000', rate: '30%', color: 'bg-rose-200 text-rose-700' },
+  { range: '5,000,001 ขึ้นไป', rate: '35%', color: 'bg-rose-200 text-rose-700' },
 ];
 
 export default function TaxPage() {
@@ -138,7 +138,7 @@ export default function TaxPage() {
   if (!mounted) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -147,27 +147,48 @@ export default function TaxPage() {
   const annualIncome = input.monthlyIncome * 12 + input.otherIncome;
 
   return (
-    <div className="min-h-screen bg-blue-50">
+    <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #EEF2FF 0%, #F0F9FF 100%)' }}>
+
       {/* Header */}
-      <div className="bg-white shadow-sm px-4 py-4 sticky top-0 z-10">
-        <h1 className="text-2xl font-bold text-gray-800">คำนวณภาษี</h1>
-        <p className="text-sm text-gray-400">ตามกฎหมายภาษีเงินได้บุคคลธรรมดา พ.ศ. 2567</p>
+      <div
+        className="px-5 pt-14 pb-6 relative overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 60%, #34D399 100%)' }}
+      >
+        <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full opacity-10"
+             style={{ background: 'radial-gradient(circle, #fff, transparent)' }} />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full opacity-10"
+             style={{ background: 'radial-gradient(circle, #fff, transparent)' }} />
+
+        <div className="relative">
+          <h1 className="text-3xl font-black text-white">คำนวณภาษี</h1>
+          <p className="text-emerald-100 text-sm mt-1">ภาษีเงินได้บุคคลธรรมดา พ.ศ. 2567</p>
+
+          {annualIncome > 0 && (
+            <div className="mt-4 bg-white/15 rounded-2xl px-4 py-3 border border-white/20 backdrop-blur-sm">
+              <p className="text-emerald-100 text-xs font-medium mb-0.5">รายได้รวมต่อปี</p>
+              <p className="text-white font-black text-2xl">{formatTHB(annualIncome)}</p>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="px-4 pt-4 space-y-4">
+      <div className="px-4 -mt-3 space-y-4 pb-8">
 
         {/* Income Section */}
         <div className="card">
-          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-base">💼</span>
-            รายได้
-          </h2>
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-9 h-9 rounded-2xl flex items-center justify-center text-lg"
+                 style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)' }}>
+              <span>💼</span>
+            </div>
+            <h2 className="text-xl font-bold text-slate-800">รายได้</h2>
+          </div>
 
           <div className="space-y-4">
             <div>
               <label className="label">เงินเดือน (บาท/เดือน)</label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-lg">฿</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">฿</span>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -182,7 +203,7 @@ export default function TaxPage() {
             <div>
               <label className="label">รายได้อื่นต่อปี (เงินปันผล, ฯลฯ)</label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-lg">฿</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">฿</span>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -193,33 +214,112 @@ export default function TaxPage() {
                 />
               </div>
             </div>
-
-            {annualIncome > 0 && (
-              <div className="bg-blue-50 rounded-xl px-4 py-3 flex justify-between items-center">
-                <span className="text-blue-700 font-semibold">รายได้รวมต่อปี</span>
-                <span className="text-blue-700 font-black text-xl">{formatTHB(annualIncome)}</span>
-              </div>
-            )}
           </div>
         </div>
 
+        {/* Tax Result — shown above deductions for quick feedback */}
+        {annualIncome > 0 && (
+          <div className="card">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-9 h-9 rounded-2xl flex items-center justify-center text-lg"
+                   style={{ background: result.taxAmount === 0 ? 'linear-gradient(135deg, #059669, #10B981)' : 'linear-gradient(135deg, #E11D48, #F43F5E)' }}>
+                <span>🧮</span>
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">ผลการคำนวณ</h2>
+            </div>
+
+            {/* Big tax number */}
+            <div className={`rounded-2xl p-5 mb-4 text-center border-2 ${
+              result.taxAmount === 0
+                ? 'bg-emerald-50 border-emerald-100'
+                : 'bg-rose-50 border-rose-100'
+            }`}>
+              <p className="text-slate-500 text-sm font-medium mb-1">ภาษีที่ต้องเสียต่อปี</p>
+              <p className={`text-4xl font-black ${result.taxAmount === 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {formatTHB(result.taxAmount)}
+              </p>
+              <p className="text-sm text-slate-400 mt-2">
+                อัตราภาษีที่แท้จริง {result.effectiveRate.toFixed(2)}%
+              </p>
+              {result.taxAmount > 0 && (
+                <div className="mt-3 pt-3 border-t border-rose-100">
+                  <p className="text-sm text-rose-500 font-semibold">
+                    เฉลี่ย {formatTHB(result.taxAmount / 12)} / เดือน
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Deduction breakdown */}
+            <div className="bg-slate-50 rounded-2xl p-4 mb-3">
+              <p className="font-bold text-slate-600 text-sm uppercase tracking-wide mb-3">รายละเอียดลดหย่อน</p>
+              <div className="divide-y divide-slate-100">
+                <ResultRow label="รายได้รวม" value={formatTHB(result.grossAnnualIncome)} highlight />
+                <ResultRow label="หักค่าใช้จ่าย (50%)" value={`−${formatTHB(result.employmentDeduction)}`} />
+                <ResultRow label="ลดหย่อนส่วนตัว" value={`−${formatTHB(result.personalDeduction)}`} />
+                {result.spouseDeduction > 0 && (
+                  <ResultRow label="คู่สมรส" value={`−${formatTHB(result.spouseDeduction)}`} />
+                )}
+                {result.childDeduction > 0 && (
+                  <ResultRow label={`บุตร (${input.deductions.childrenCount} คน)`} value={`−${formatTHB(result.childDeduction)}`} />
+                )}
+                {result.parentDeduction > 0 && (
+                  <ResultRow label={`บิดามารดา (${input.deductions.parentsCount} คน)`} value={`−${formatTHB(result.parentDeduction)}`} />
+                )}
+                {result.socialSecurityDeduction > 0 && (
+                  <ResultRow label="ประกันสังคม" value={`−${formatTHB(result.socialSecurityDeduction)}`} />
+                )}
+                {result.lifeInsuranceDeduction > 0 && (
+                  <ResultRow label="ประกันชีวิต" value={`−${formatTHB(result.lifeInsuranceDeduction)}`} />
+                )}
+                {result.healthInsuranceDeduction > 0 && (
+                  <ResultRow label="ประกันสุขภาพ" value={`−${formatTHB(result.healthInsuranceDeduction)}`} />
+                )}
+                {(result.pvdDeduction + result.ssfDeduction + result.rmfDeduction) > 0 && (
+                  <ResultRow label="กองทุน PVD/SSF/RMF" value={`−${formatTHB(result.pvdDeduction + result.ssfDeduction + result.rmfDeduction)}`} />
+                )}
+                {result.mortgageDeduction > 0 && (
+                  <ResultRow label="ดอกเบี้ยบ้าน" value={`−${formatTHB(result.mortgageDeduction)}`} />
+                )}
+                {result.donationDeduction > 0 && (
+                  <ResultRow label="เงินบริจาค" value={`−${formatTHB(result.donationDeduction)}`} />
+                )}
+                <div className="pt-2 mt-1">
+                  <ResultRow label="ลดหย่อนรวม" value={`−${formatTHB(result.totalDeductions)}`} highlight />
+                  <ResultRow label="เงินได้สุทธิ" value={formatTHB(result.netIncome)} highlight />
+                </div>
+              </div>
+            </div>
+
+            {result.taxAmount > 0 && (
+              <div className="bg-indigo-50 rounded-2xl px-4 py-3 border border-indigo-100">
+                <p className="font-bold text-indigo-700 text-sm mb-0.5">ลองเพิ่มรายการลดหย่อนด้านล่าง</p>
+                <p className="text-xs text-indigo-500">ประกันชีวิต ประกันสุขภาพ กองทุน SSF/RMF ช่วยลดภาษีได้มาก</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Deductions Section */}
         <div className="card">
-          <h2 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-            <span className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-base">📋</span>
-            รายการลดหย่อน
-          </h2>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-9 h-9 rounded-2xl flex items-center justify-center text-lg"
+                 style={{ background: 'linear-gradient(135deg, #059669, #10B981)' }}>
+              <span>📋</span>
+            </div>
+            <h2 className="text-xl font-bold text-slate-800">รายการลดหย่อน</h2>
+          </div>
 
-          {/* Auto deductions */}
-          <div className="bg-green-50 rounded-xl p-3 mb-4 space-y-1">
-            <p className="text-sm font-bold text-green-700 mb-2">ลดหย่อนอัตโนมัติ</p>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">หักค่าใช้จ่าย (50%, สูงสุด 100,000 บาท)</span>
-              <span className="font-bold text-green-700">{formatTHB(result.employmentDeduction)}</span>
+          {/* Auto deductions summary */}
+          <div className="bg-emerald-50 rounded-2xl px-4 py-3 mb-4 border border-emerald-100">
+            <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-2">ลดหย่อนอัตโนมัติ</p>
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-slate-600">หักค่าใช้จ่าย (50%, สูงสุด 100,000 บาท)</span>
+              <span className="font-bold text-emerald-700">{formatTHB(result.employmentDeduction)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">ลดหย่อนส่วนตัว</span>
-              <span className="font-bold text-green-700">{formatTHB(result.personalDeduction)}</span>
+              <span className="text-slate-600">ลดหย่อนส่วนตัว</span>
+              <span className="font-bold text-emerald-700">{formatTHB(result.personalDeduction)}</span>
             </div>
           </div>
 
@@ -281,11 +381,11 @@ export default function TaxPage() {
             />
             <DeductionRow
               label="คู่สมรส (ไม่มีรายได้)"
+              sub="ลดหย่อน ฿60,000"
               value={input.deductions.hasSpouse ? 1 : 0}
               onChange={(v) => setDeduction('hasSpouse', v > 0)}
               type="count"
               max={1}
-              sub="ลดหย่อน ฿60,000"
             />
             <DeductionRow
               label="บุตร"
@@ -305,114 +405,34 @@ export default function TaxPage() {
           </div>
         </div>
 
-        {/* Tax Result */}
-        {annualIncome > 0 && (
-          <div className="card">
-            <h2 className="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-base">🧮</span>
-              ผลการคำนวณ
-            </h2>
-
-            {/* Main Tax Display */}
-            <div className={`rounded-2xl p-5 mb-4 text-center ${
-              result.taxAmount === 0 ? 'bg-green-50 border-2 border-green-200' : 'bg-red-50 border-2 border-red-200'
-            }`}>
-              <p className="text-gray-500 text-base mb-1">ภาษีที่ต้องเสีย</p>
-              <p className={`text-4xl font-black ${result.taxAmount === 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatTHB(result.taxAmount)}
-              </p>
-              <p className="text-sm text-gray-400 mt-2">
-                อัตราภาษีที่แท้จริง {result.effectiveRate.toFixed(2)}%
-              </p>
-            </div>
-
-            {/* Deduction Breakdown */}
-            <div className="bg-gray-50 rounded-xl p-4 mb-4">
-              <p className="font-bold text-gray-700 mb-3">รายละเอียดลดหย่อน</p>
-              <div className="divide-y divide-gray-100">
-                <ResultRow label="รายได้รวม" value={formatTHB(result.grossAnnualIncome)} highlight />
-                <ResultRow label="หักค่าใช้จ่าย (50%)" value={`−${formatTHB(result.employmentDeduction)}`} />
-                <ResultRow label="ลดหย่อนส่วนตัว" value={`−${formatTHB(result.personalDeduction)}`} />
-                {result.spouseDeduction > 0 && (
-                  <ResultRow label="คู่สมรส" value={`−${formatTHB(result.spouseDeduction)}`} />
-                )}
-                {result.childDeduction > 0 && (
-                  <ResultRow label={`บุตร (${input.deductions.childrenCount} คน)`} value={`−${formatTHB(result.childDeduction)}`} />
-                )}
-                {result.parentDeduction > 0 && (
-                  <ResultRow label={`บิดามารดา (${input.deductions.parentsCount} คน)`} value={`−${formatTHB(result.parentDeduction)}`} />
-                )}
-                {result.socialSecurityDeduction > 0 && (
-                  <ResultRow label="ประกันสังคม" value={`−${formatTHB(result.socialSecurityDeduction)}`} />
-                )}
-                {result.lifeInsuranceDeduction > 0 && (
-                  <ResultRow label="ประกันชีวิต" value={`−${formatTHB(result.lifeInsuranceDeduction)}`} />
-                )}
-                {result.healthInsuranceDeduction > 0 && (
-                  <ResultRow label="ประกันสุขภาพ" value={`−${formatTHB(result.healthInsuranceDeduction)}`} />
-                )}
-                {(result.pvdDeduction + result.ssfDeduction + result.rmfDeduction) > 0 && (
-                  <ResultRow label="กองทุน PVD/SSF/RMF" value={`−${formatTHB(result.pvdDeduction + result.ssfDeduction + result.rmfDeduction)}`} />
-                )}
-                {result.mortgageDeduction > 0 && (
-                  <ResultRow label="ดอกเบี้ยบ้าน" value={`−${formatTHB(result.mortgageDeduction)}`} />
-                )}
-                {result.donationDeduction > 0 && (
-                  <ResultRow label="เงินบริจาค" value={`−${formatTHB(result.donationDeduction)}`} />
-                )}
-                <div className="pt-2 mt-1">
-                  <ResultRow label="ลดหย่อนรวม" value={`−${formatTHB(result.totalDeductions)}`} highlight />
-                  <ResultRow label="เงินได้สุทธิ" value={formatTHB(result.netIncome)} highlight />
-                </div>
-              </div>
-            </div>
-
-            {/* Monthly breakdown */}
-            {result.taxAmount > 0 && (
-              <div className="bg-orange-50 rounded-xl p-4 mb-4">
-                <p className="font-bold text-orange-700 mb-2">เฉลี่ยต่อเดือน</p>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">ภาษีต่อเดือน</span>
-                  <span className="font-bold text-orange-600">{formatTHB(result.taxAmount / 12)}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Savings tip */}
-            {result.taxAmount > 0 && (
-              <div className="bg-blue-50 rounded-xl p-4">
-                <p className="font-bold text-blue-700 mb-1">💡 เพิ่มลดหย่อน ประหยัดภาษี</p>
-                <p className="text-sm text-blue-600">
-                  ลองใส่รายการลดหย่อน เช่น ประกันชีวิต ประกันสุขภาพ กองทุน SSF/RMF เพื่อลดภาษี
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Tax Brackets Reference */}
         <div className="card mb-4">
           <button
             onClick={() => setShowBrackets(!showBrackets)}
             className="w-full flex items-center justify-between"
           >
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <span className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center text-base">📊</span>
-              อัตราภาษีเงินได้บุคคลธรรมดา
-            </h2>
-            <svg className={`w-6 h-6 text-gray-400 transition-transform ${showBrackets ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl flex items-center justify-center text-lg"
+                   style={{ background: 'linear-gradient(135deg, #7C3AED, #8B5CF6)' }}>
+                <span>📊</span>
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">อัตราภาษีเงินได้</h2>
+            </div>
+            <svg className={`w-5 h-5 text-slate-400 transition-transform ${showBrackets ? 'rotate-180' : ''}`}
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
+
           {showBrackets && (
             <div className="mt-4 space-y-2">
               {TAX_BRACKETS.map((b) => (
-                <div key={b.range} className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">{b.range}</span>
+                <div key={b.range} className="flex justify-between items-center py-1">
+                  <span className="text-sm text-slate-600">{b.range}</span>
                   <span className={`text-sm font-bold px-3 py-1 rounded-full ${b.color}`}>{b.rate}</span>
                 </div>
               ))}
-              <p className="text-xs text-gray-400 mt-2 text-center">หน่วย: บาทต่อปี</p>
+              <p className="text-xs text-slate-400 mt-2 text-center">หน่วย: บาทต่อปี</p>
             </div>
           )}
         </div>
