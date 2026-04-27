@@ -73,7 +73,17 @@
   background-clip: text;
 }
 
-/* Safe area bottom padding */
+/* Safe area padding utilities */
 .pb-safe {
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Page header top padding — adds status-bar height in PWA mode, falls back to 3.5rem in browser */
+.pt-page-header {
+  padding-top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 1.25rem));
+}
+
+/* Modal sheet safe-area bottom — use on the scrollable sheet div */
+.modal-pb-safe {
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
 }

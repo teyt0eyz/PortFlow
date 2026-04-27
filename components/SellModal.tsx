@@ -94,8 +94,13 @@ export default function SellModal({ stock, onSell, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-end"
          style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}>
-      <div className="bg-white rounded-t-3xl w-full max-h-[92vh] overflow-y-auto pb-8"
-           style={{ boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}>
+      <div className="bg-white rounded-t-3xl w-full overflow-y-scroll"
+           style={{
+             boxShadow: '0 -8px 40px rgba(0,0,0,0.15)',
+             maxHeight: '92dvh',
+             WebkitOverflowScrolling: 'touch',
+             paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',
+           }}>
 
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-4">

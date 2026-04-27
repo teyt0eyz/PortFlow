@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getStocks } from '@/lib/storage';
+import { getStocks, getTargetAllocation, saveTargetAllocation, TargetAllocation } from '@/lib/storage';
 import { Stock } from '@/lib/types';
 import { summarizeStocks } from '@/lib/stockCalculation';
 import {
@@ -21,6 +21,8 @@ export default function HomePage() {
   const [rateUpdatedAt, setRateUpdatedAt] = useState('');
   const [fetchingRate, setFetchingRate] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [target, setTarget] = useState<TargetAllocation>({ us: 34, thai: 33, fund: 33 });
+  const [showInsight, setShowInsight] = useState(false);
 
   useEffect(() => {
     const all = getStocks();
@@ -30,8 +32,15 @@ export default function HomePage() {
     setCurrency(getSavedCurrency());
     setRate(getSavedRate());
     setRateUpdatedAt(getRateUpdatedAt());
+    setTarget(getTargetAllocation());
     setMounted(true);
   }, []);
+
+  function updateTarget(key: keyof TargetAllocation, delta: number) {
+    const next = { ...target, [key]: Math.max(0, Math.min(100, target[key] + delta)) };
+    setTarget(next);
+    saveTargetAllocation(next);
+  }
 
   async function refreshRate() {
     setFetchingRate(true);
@@ -82,7 +91,7 @@ export default function HomePage() {
 
       {/* ── Header ── */}
       <div
-        className="px-5 pt-14 pb-8 relative overflow-hidden"
+        className="px-5 pt-page-header pb-8 relative overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #4338CA 0%, #4F46E5 50%, #6366F1 100%)' }}
       >
         {/* decorative circles */}
@@ -194,6 +203,103 @@ export default function HomePage() {
             rate={rate}
           />
         )}
+
+        {/* Target Allocation Insight */}
+        {hasStocks && (() => {
+          const totalVal = totalValue || 1;
+          const curUs   = (usValue / totalVal) * 100;
+          const curThai = (thaiValue / totalVal) * 100;
+          const curFund = (fundValue / totalVal) * 100;
+          const totalTarget = target.us + target.thai + target.fund;
+
+          const categories = [
+            { key: 'us' as keyof TargetAllocation, label: 'หุ้น US', flag: '🇺🇸', color: '#4F46E5', cur: curUs, val: usValue },
+            { key: 'thai' as keyof TargetAllocation, label: 'หุ้น ไทย', flag: '🇹🇭', color: '#0EA5E9', cur: curThai, val: thaiValue },
+            { key: 'fund' as keyof TargetAllocation, label: 'กองทุน', flag: '🏦', color: '#7C3AED', cur: curFund, val: fundValue },
+          ];
+
+          return (
+            <div className="card">
+              <button onClick={() => setShowInsight(!showInsight)} className="w-full flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
+                       style={{ background: 'linear-gradient(135deg, #4338CA, #7C3AED)' }}>
+                    <span>🎯</span>
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold text-slate-800">เป้าหมายพอร์ต</p>
+                    <p className="text-xs text-slate-400">ตั้งสัดส่วนและดูคำแนะนำ</p>
+                  </div>
+                </div>
+                <svg className={`w-5 h-5 text-slate-400 transition-transform flex-shrink-0 ${showInsight ? 'rotate-180' : ''}`}
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {showInsight && (
+                <div className="mt-4 space-y-4">
+                  {totalTarget !== 100 && (
+                    <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-xl font-medium">
+                      รวมเป้าหมาย {totalTarget}% — ควรเท่ากับ 100%
+                    </p>
+                  )}
+
+                  {categories.map(({ key, label, flag, color, cur, val }) => {
+                    const tgt = target[key];
+                    const diff = totalValue > 0 ? (tgt / 100) * totalValue - val : 0;
+                    const isOver = diff < -totalValue * 0.01;
+                    const isUnder = diff > totalValue * 0.01;
+
+                    return (
+                      <div key={key} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{flag}</span>
+                            <span className="font-semibold text-slate-700 text-sm">{label}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => updateTarget(key, -5)}
+                              className="w-7 h-7 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 font-bold active:bg-slate-200 text-sm">
+                              −
+                            </button>
+                            <span className="w-10 text-center font-black text-slate-800 text-base">{tgt}%</span>
+                            <button onClick={() => updateTarget(key, 5)}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold active:opacity-70 text-sm"
+                              style={{ background: color }}>
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Bar: current vs target */}
+                        <div className="relative h-3 bg-slate-100 rounded-full overflow-visible">
+                          <div className="absolute inset-y-0 left-0 rounded-full transition-all"
+                               style={{ width: `${Math.min(100, cur)}%`, background: color, opacity: 0.35 }} />
+                          <div className="absolute top-0 bottom-0 w-0.5 bg-white rounded-full shadow"
+                               style={{ left: `${Math.min(99, tgt)}%` }} />
+                        </div>
+
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400">ปัจจุบัน <span className="font-semibold text-slate-600">{cur.toFixed(1)}%</span></span>
+                          {isUnder && (
+                            <span className="font-semibold text-emerald-600">ซื้อเพิ่ม {fmt(diff, currency)}</span>
+                          )}
+                          {isOver && (
+                            <span className="font-semibold text-amber-600">เกินเป้า {fmt(Math.abs(diff), currency)}</span>
+                          )}
+                          {!isUnder && !isOver && totalValue > 0 && (
+                            <span className="font-semibold text-indigo-500">ตรงเป้า</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* US Stocks Card */}
         <PortfolioCard

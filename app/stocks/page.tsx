@@ -140,7 +140,7 @@ function StocksContent() {
     <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #EEF2FF 0%, #F0F9FF 100%)' }}>
 
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 px-4 pt-14 pb-0 sticky top-0 z-10"
+      <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 px-4 pt-page-header pb-0 sticky top-0 z-10"
            style={{ boxShadow: '0 2px 20px rgba(79,70,229,0.06)' }}>
         <div className="flex items-center justify-between pb-3">
           <div>

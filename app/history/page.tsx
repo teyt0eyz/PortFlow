@@ -102,7 +102,7 @@ export default function HistoryPage() {
     <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #EEF2FF 0%, #F0F9FF 100%)' }}>
 
       {/* Header */}
-      <div className="px-5 pt-14 pb-6 relative overflow-hidden"
+      <div className="px-5 pt-page-header pb-6 relative overflow-hidden"
            style={{ background: 'linear-gradient(135deg, #1D4ED8 0%, #4F46E5 60%, #7C3AED 100%)' }}>
         <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full opacity-10"
              style={{ background: 'radial-gradient(circle, #fff, transparent)' }} />

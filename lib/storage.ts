@@ -82,3 +82,26 @@ export function deleteSellTransaction(id: string): void {
 export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
+
+const TARGET_KEY = 'portflow_target';
+
+export interface TargetAllocation {
+  us: number;
+  thai: number;
+  fund: number;
+}
+
+export function getTargetAllocation(): TargetAllocation {
+  if (typeof window === 'undefined') return { us: 34, thai: 33, fund: 33 };
+  try {
+    const data = localStorage.getItem(TARGET_KEY);
+    return data ? JSON.parse(data) : { us: 34, thai: 33, fund: 33 };
+  } catch {
+    return { us: 34, thai: 33, fund: 33 };
+  }
+}
+
+export function saveTargetAllocation(t: TargetAllocation): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(TARGET_KEY, JSON.stringify(t));
+}

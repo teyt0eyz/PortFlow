@@ -1,11 +1,21 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import BottomNav from '@/components/BottomNav';
+import PwaRegister from '@/components/PwaRegister';
 
 export const metadata: Metadata = {
   title: 'PortFlow - บันทึกหุ้น',
   description: 'ระบบจดบันทึกการลงทุนและคำนวณภาษีสำหรับคนไทย',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/icon.png',
+    apple: '/icon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'PortFlow',
+    statusBarStyle: 'black-translucent',
+  },
 };
 
 export const viewport: Viewport = {
@@ -13,7 +23,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#2563EB',
+  themeColor: '#4338CA',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -25,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </main>
           <BottomNav />
+          <PwaRegister />
         </div>
       </body>
     </html>

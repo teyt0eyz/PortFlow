@@ -25,6 +25,9 @@ export default function StockDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showSell, setShowSell] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [showAdc, setShowAdc] = useState(false);
+  const [adcAmount, setAdcAmount] = useState('');
+  const [adcPrice, setAdcPrice] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMsg, setRefreshMsg] = useState('');
 
@@ -89,7 +92,17 @@ export default function StockDetailPage() {
 
   const { currentValue, profitLoss, profitLossPercent, totalCost, tradeCost } = calculateStockValue(stock);
   const fmt = stock.category === 'us' ? formatUSD : formatTHB;
+  const sym = stock.category === 'us' ? '$' : '฿';
+  const unitLabel = stock.category === 'fund' ? 'หน่วย' : 'หุ้น';
   const isProfit = profitLoss >= 0;
+
+  const adcAmountNum = Number(adcAmount) || 0;
+  const adcPriceNum = Number(adcPrice) || 0;
+  const adcShares = adcPriceNum > 0 ? adcAmountNum / adcPriceNum : 0;
+  const newTotalShares = stock.shares + adcShares;
+  const newTradeCost = tradeCost + adcAmountNum;
+  const newAvgPrice = newTotalShares > 0 ? newTradeCost / newTotalShares : 0;
+  const adcIsLower = adcAmountNum > 0 && adcPriceNum > 0 && newAvgPrice < stock.purchasePrice;
 
   const plGradient = isProfit
     ? 'linear-gradient(135deg, #059669, #10B981)'
@@ -105,7 +118,7 @@ export default function StockDetailPage() {
              style={{ background: 'radial-gradient(circle, #fff, transparent)' }} />
 
         {/* Back button */}
-        <div className="px-4 pt-14 pb-0">
+        <div className="px-4 pt-page-header pb-0">
           <button onClick={() => router.back()}
             className="flex items-center gap-1.5 text-white/80 text-base font-medium mb-4 active:opacity-60">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -206,6 +219,88 @@ export default function StockDetailPage() {
             <p className="text-slate-700 text-base leading-relaxed">{stock.note}</p>
           </div>
         )}
+
+        {/* Average Down Calculator */}
+        <div className="card">
+          <button
+            onClick={() => setShowAdc(!showAdc)}
+            className="w-full flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center text-xl flex-shrink-0">
+                🧮
+              </div>
+              <div className="text-left">
+                <p className="font-bold text-slate-800">คำนวณซื้อเพิ่ม</p>
+                <p className="text-xs text-slate-400">Average Down / Average Up</p>
+              </div>
+            </div>
+            <svg className={`w-5 h-5 text-slate-400 transition-transform flex-shrink-0 ${showAdc ? 'rotate-180' : ''}`}
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showAdc && (
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">เงินที่จะซื้อเพิ่ม ({sym})</label>
+                  <input type="number" inputMode="decimal"
+                    value={adcAmount}
+                    onChange={(e) => setAdcAmount(e.target.value)}
+                    placeholder="0.00" min="0"
+                    className="input-field" />
+                </div>
+                <div>
+                  <label className="label">ราคาที่จะซื้อ ({sym})</label>
+                  <input type="number" inputMode="decimal"
+                    value={adcPrice}
+                    onChange={(e) => setAdcPrice(e.target.value)}
+                    placeholder={String(stock.currentPrice)} min="0"
+                    className="input-field" />
+                </div>
+              </div>
+
+              {adcAmountNum > 0 && adcPriceNum > 0 && (
+                <div className={`rounded-2xl p-4 border-2 ${adcIsLower ? 'bg-amber-50 border-amber-100' : 'bg-blue-50 border-blue-100'}`}>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">ผลที่จะได้</p>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <p className="text-xs text-slate-400">จำนวนหลังซื้อ</p>
+                      <p className="font-bold text-slate-800">
+                        {newTotalShares % 1 === 0
+                          ? newTotalShares.toLocaleString('th-TH')
+                          : newTotalShares.toFixed(4)} {unitLabel}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">ต้นทุนรวมใหม่</p>
+                      <p className="font-bold text-slate-800">{fmt(newTradeCost)}</p>
+                    </div>
+                  </div>
+                  <div className={`pt-3 border-t ${adcIsLower ? 'border-amber-200' : 'border-blue-200'} flex items-center justify-between`}>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-0.5">ราคาทุนเฉลี่ยใหม่</p>
+                      <p className={`text-2xl font-black ${adcIsLower ? 'text-amber-600' : 'text-blue-600'}`}>
+                        {fmt(newAvgPrice)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-slate-400 mb-0.5">จากเดิม {fmt(stock.purchasePrice)}</p>
+                      <span className={`text-sm font-bold px-2.5 py-1 rounded-full ${
+                        adcIsLower ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {adcIsLower ? '▼ ลดลง' : '▲ สูงขึ้น'}{' '}
+                        {Math.abs(((newAvgPrice - stock.purchasePrice) / stock.purchasePrice) * 100).toFixed(2)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Actions */}
         <div className="space-y-3">
