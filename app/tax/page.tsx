@@ -203,7 +203,7 @@ export default function TaxPage() {
         </div>
       </div>
 
-      <div className="px-4 -mt-3 space-y-4 pb-8">
+      <div className="px-4 mt-4 space-y-4 pb-8">
 
         {/* Income Section */}
         <div className="card">

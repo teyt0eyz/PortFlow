@@ -164,7 +164,7 @@ export default function HomePage() {
       </div>
 
       {/* ── Content ── */}
-      <div className="px-4 -mt-3 space-y-4 pb-6">
+      <div className="px-4 mt-4 space-y-4 pb-6">
 
         {/* Total Summary */}
         {hasStocks && (
