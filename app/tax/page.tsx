@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { TaxInputData, TaxDeductions, SellTransaction } from '@/lib/types';
+import { TaxInputData, TaxDeductions, SellTransaction, Dividend } from '@/lib/types';
 import { calculateTax, computeTax, formatTHB } from '@/lib/taxCalculation';
-import { getTaxData, saveTaxData, getSellTransactions } from '@/lib/storage';
+import { getTaxData, saveTaxData, getSellTransactions, getDividends } from '@/lib/storage';
 
 const DEFAULT_DEDUCTIONS: TaxDeductions = {
   lifeInsurance: 0,
@@ -111,6 +111,7 @@ export default function TaxPage() {
   const [showBrackets, setShowBrackets] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [sells, setSells] = useState<SellTransaction[]>([]);
+  const [dividends, setDividends] = useState<Dividend[]>([]);
   const [cgtInput, setCgtInput] = useState('');
   const [cgtRate, setCgtRate] = useState('35');
   interface CgtResult { gains: number; additional: number; total: number; marginalRate: number }
@@ -120,6 +121,7 @@ export default function TaxPage() {
     const saved = getTaxData();
     if (saved) setInput(saved);
     setSells(getSellTransactions());
+    setDividends(getDividends());
     setMounted(true);
   }, []);
 
@@ -176,6 +178,20 @@ export default function TaxPage() {
 
   const cgtRateNum = Number(cgtRate) || 35;
   const usGainsAutoTHB = usRealizedGainsUSD * cgtRateNum;
+
+  // Dividend withholding tax — group by ticker
+  const dividendByTicker = dividends.reduce<Record<string, { name: string; category: string; gross: number; tax: number; net: number; count: number }>>((acc, d) => {
+    if (!acc[d.ticker]) acc[d.ticker] = { name: d.name, category: d.category, gross: 0, tax: 0, net: 0, count: 0 };
+    acc[d.ticker].gross += d.grossAmount;
+    acc[d.ticker].tax += d.withholdingTax;
+    acc[d.ticker].net += d.netAmount;
+    acc[d.ticker].count += 1;
+    return acc;
+  }, {});
+  const dividendRows = Object.entries(dividendByTicker).sort((a, b) => b[1].gross - a[1].gross);
+  const totalDividendGross = dividends.reduce((s, d) => s + d.grossAmount, 0);
+  const totalDividendTax = dividends.reduce((s, d) => s + d.withholdingTax, 0);
+  const totalDividendNet = dividends.reduce((s, d) => s + d.netAmount, 0);
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #EEF2FF 0%, #F0F9FF 100%)' }}>
@@ -592,6 +608,60 @@ export default function TaxPage() {
             </div>
           )}
         </div>
+
+        {/* Dividend Withholding Tax */}
+        {dividends.length > 0 && (
+          <div className="card">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-9 h-9 rounded-2xl flex items-center justify-center text-lg"
+                   style={{ background: 'linear-gradient(135deg, #059669, #10B981)' }}>
+                <span>💰</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">ภาษีหัก ณ ที่จ่าย (เงินปันผล)</h2>
+                <p className="text-xs text-slate-400">รายการปันผลที่ถูกหักภาษีไปแล้ว</p>
+              </div>
+            </div>
+
+            {/* Per-stock rows */}
+            {dividendRows.map(([ticker, d]) => (
+              <div key={ticker} className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm flex-shrink-0"
+                     style={{ background: d.category === 'us' ? '#EEF2FF' : d.category === 'thai' ? '#FFF1F2' : '#F5F3FF' }}>
+                  {d.category === 'us' ? '🇺🇸' : d.category === 'thai' ? '🇹🇭' : '🏦'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-800">{ticker}</p>
+                  <p className="text-xs text-slate-400">{d.count} ครั้ง · รวม {formatTHB(d.gross)}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="font-bold text-rose-500 text-sm">−{formatTHB(d.tax)}</p>
+                  <p className="text-xs text-slate-400">รับ {formatTHB(d.net)}</p>
+                </div>
+              </div>
+            ))}
+
+            {/* Total */}
+            <div className="mt-3 bg-slate-50 rounded-2xl px-4 py-3 space-y-1.5">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">ปันผลรวม (ก่อนหักภาษี)</span>
+                <span className="font-semibold text-slate-800">{formatTHB(totalDividendGross)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">ภาษีหัก ณ ที่จ่ายรวม</span>
+                <span className="font-semibold text-rose-500">−{formatTHB(totalDividendTax)}</span>
+              </div>
+              <div className="flex justify-between font-bold pt-1.5 border-t border-slate-200">
+                <span className="text-slate-700">รับสุทธิรวม</span>
+                <span className="text-emerald-600 text-lg">{formatTHB(totalDividendNet)}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400 mt-3 leading-relaxed">
+              ภาษีหัก ณ ที่จ่าย ถูกหักโดยบริษัทก่อนจ่ายให้ผู้ถือหุ้น สามารถนำมาเครดิตในการยื่น ภ.ง.ด.90 ได้หากเลือกรวมเป็นรายได้
+            </p>
+          </div>
+        )}
 
         {/* Tax Brackets Reference */}
         <div className="card mb-4">

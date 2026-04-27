@@ -1,27 +1,29 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getSellTransactions, getStocks } from '@/lib/storage';
-import { SellTransaction, Stock } from '@/lib/types';
+import { getSellTransactions, getStocks, getDividends } from '@/lib/storage';
+import { SellTransaction, Stock, Dividend } from '@/lib/types';
 import { calculateStockValue } from '@/lib/stockCalculation';
 import { getSavedCurrency, getSavedRate, saveCurrency, Currency, convert, fmt } from '@/lib/currency';
 
 type YearEntry = {
   year: number;
-  // Buys (by purchaseDate year) — includes held + sold positions purchased that year
   buyTotal: number;
   holdCount: number;
   holdValue: number;
   holdProfit: number;
-  // Sells (by sellDate year)
   sellCount: number;
   sellProceeds: number;
   sellCostBasis: number;
   sellProfit: number;
+  dividendCount: number;
+  dividendGross: number;
+  dividendTax: number;
+  dividendNet: number;
 };
 
 function blank(year: number): YearEntry {
-  return { year, buyTotal: 0, holdCount: 0, holdValue: 0, holdProfit: 0, sellCount: 0, sellProceeds: 0, sellCostBasis: 0, sellProfit: 0 };
+  return { year, buyTotal: 0, holdCount: 0, holdValue: 0, holdProfit: 0, sellCount: 0, sellProceeds: 0, sellCostBasis: 0, sellProfit: 0, dividendCount: 0, dividendGross: 0, dividendTax: 0, dividendNet: 0 };
 }
 
 function getYear(dateStr: string) {
@@ -31,6 +33,7 @@ function getYear(dateStr: string) {
 export default function HistoryPage() {
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [sells, setSells] = useState<SellTransaction[]>([]);
+  const [dividends, setDividends] = useState<Dividend[]>([]);
   const [currency, setCurrency] = useState<Currency>('THB');
   const [rate, setRate] = useState(35);
   const [mounted, setMounted] = useState(false);
@@ -38,6 +41,7 @@ export default function HistoryPage() {
   useEffect(() => {
     setStocks(getStocks());
     setSells(getSellTransactions());
+    setDividends(getDividends());
     setCurrency(getSavedCurrency());
     setRate(getSavedRate());
     setMounted(true);
@@ -81,6 +85,15 @@ export default function HistoryPage() {
     se.sellProfit += toCur(tx.netProfit ?? tx.profit, tx.category);
   }
 
+  // Dividends → by payment year
+  for (const d of dividends) {
+    const de = entry(getYear(d.date));
+    de.dividendCount++;
+    de.dividendGross += toCur(d.grossAmount, d.category);
+    de.dividendTax += toCur(d.withholdingTax, d.category);
+    de.dividendNet += toCur(d.netAmount, d.category);
+  }
+
   const allYears = Array.from(yearMap.values()).sort((a, b) => b.year - a.year);
 
   // Lifetime totals
@@ -96,7 +109,9 @@ export default function HistoryPage() {
   }, 0);
   const lifetimePL = lifetimeRealized + lifetimeUnrealized;
 
-  const hasAny = stocks.length > 0 || sells.length > 0;
+  const lifetimeDividendNet = dividends.reduce((s, d) => s + toCur(d.netAmount, d.category), 0);
+  const lifetimeDividendTax = dividends.reduce((s, d) => s + toCur(d.withholdingTax, d.category), 0);
+  const hasAny = stocks.length > 0 || sells.length > 0 || dividends.length > 0;
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #EEF2FF 0%, #F0F9FF 100%)' }}>
@@ -156,6 +171,15 @@ export default function HistoryPage() {
                 </div>
               ))}
             </div>
+            {dividends.length > 0 && (
+              <div className="bg-emerald-50 rounded-2xl px-4 py-3 mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide">เงินปันผลสะสม</p>
+                  <p className="text-xs text-slate-400 mt-0.5">หัก ณ ที่จ่าย {fmt(lifetimeDividendTax, currency)}</p>
+                </div>
+                <p className="font-black text-emerald-700 text-xl">{fmt(lifetimeDividendNet, currency)}</p>
+              </div>
+            )}
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
               <div className={`h-2 rounded-full ${lifetimePL >= 0 ? 'bg-emerald-400' : 'bg-rose-400'}`}
                    style={{ width: `${lifetimeBuyTotal > 0 ? Math.min(100, (Math.abs(lifetimePL) / lifetimeBuyTotal) * 100) : 0}%` }} />
@@ -172,6 +196,8 @@ export default function HistoryPage() {
           const hasSells = e.sellCount > 0;
           const yearPL = e.holdProfit + e.sellProfit;
 
+          const hasDividends = e.dividendCount > 0;
+
           return (
             <div key={e.year} className="card space-y-3">
               {/* Year header */}
@@ -183,7 +209,7 @@ export default function HistoryPage() {
                   <div>
                     <p className="font-bold text-slate-800 text-lg">{e.year}</p>
                     <p className="text-xs text-slate-400">
-                      {[hasBuys && `ซื้อ ${e.holdCount} รายการ`, hasSells && `ขาย ${e.sellCount} ครั้ง`].filter(Boolean).join(' · ')}
+                      {[hasBuys && `ซื้อ ${e.holdCount} รายการ`, hasSells && `ขาย ${e.sellCount} ครั้ง`, hasDividends && `ปันผล ${e.dividendCount} ครั้ง`].filter(Boolean).join(' · ')}
                     </p>
                   </div>
                 </div>
@@ -238,6 +264,27 @@ export default function HistoryPage() {
                   </div>
                 </div>
               )}
+
+              {/* Dividend section */}
+              {hasDividends && (
+                <div className="bg-emerald-50 rounded-2xl p-4 border-2 border-emerald-100">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">เงินปันผลในปีนี้ ({e.dividendCount} ครั้ง)</p>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-slate-500 text-sm">ปันผลก่อนหักภาษี</span>
+                    <span className="font-bold text-slate-800">{fmt(e.dividendGross, currency)}</span>
+                  </div>
+                  {e.dividendTax > 0 && (
+                    <div className="flex justify-between mb-2">
+                      <span className="text-slate-500 text-sm">ภาษีหัก ณ ที่จ่าย</span>
+                      <span className="font-semibold text-rose-500">−{fmt(e.dividendTax, currency)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold pt-2 border-t border-emerald-200 text-emerald-700">
+                    <span className="text-sm">รับสุทธิ</span>
+                    <span>{fmt(e.dividendNet, currency)}</span>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -271,6 +318,36 @@ export default function HistoryPage() {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Dividend list */}
+        {dividends.length > 0 && (
+          <div className="card">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">รายการเงินปันผลทั้งหมด</p>
+            {[...dividends].sort((a, b) => b.date.localeCompare(a.date)).map((d) => {
+              const f = (v: number) => fmt(toCur(v, d.category), currency);
+              return (
+                <div key={d.id} className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0"
+                       style={{ background: '#ECFDF5' }}>
+                    💰
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-800">{d.ticker}</p>
+                    <p className="text-xs text-slate-400">
+                      {d.date} · {f(d.amountPerShare)}/หุ้น{d.note ? ` · ${d.note}` : ''}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-bold text-sm text-emerald-600">{f(d.netAmount)}</p>
+                    {d.withholdingTax > 0 && (
+                      <p className="text-xs text-slate-400">รวม {f(d.grossAmount)}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 

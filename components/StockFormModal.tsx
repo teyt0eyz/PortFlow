@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { Stock } from '@/lib/types';
+import { getStocks } from '@/lib/storage';
 
 interface Props {
   initial: Stock | null;
   defaultCategory: 'us' | 'thai' | 'fund';
+  dcaFor?: { ticker: string; name: string; category: 'us' | 'thai' | 'fund'; currentPrice: number };
   onSave: (data: Omit<Stock, 'id'>) => void;
   onClose: () => void;
 }
@@ -25,7 +27,7 @@ async function fetchPrice(ticker: string, category: 'us' | 'thai' | 'fund') {
   return data as { price: number; shortName: string };
 }
 
-export default function StockFormModal({ initial, defaultCategory, onSave, onClose }: Props) {
+export default function StockFormModal({ initial, defaultCategory, dcaFor, onSave, onClose }: Props) {
   const [form, setForm] = useState({
     ticker: '',
     category: defaultCategory as 'us' | 'thai' | 'fund',
@@ -41,6 +43,7 @@ export default function StockFormModal({ initial, defaultCategory, onSave, onClo
   const [fetchError, setFetchError] = useState('');
   const [lastFetched, setLastFetched] = useState('');
   const [fetchedName, setFetchedName] = useState('');
+  const [isDca, setIsDca] = useState(false);
 
   useEffect(() => {
     if (initial) {
@@ -57,6 +60,34 @@ export default function StockFormModal({ initial, defaultCategory, onSave, onClo
       setFetchedName(initial.name !== initial.ticker ? initial.name : '');
     }
   }, [initial]);
+
+  // Pre-fill when opening as DCA from detail page
+  useEffect(() => {
+    if (dcaFor && !initial) {
+      setForm((f) => ({
+        ...f,
+        ticker: dcaFor.ticker,
+        category: dcaFor.category,
+        currentPrice: String(dcaFor.currentPrice),
+        purchasePrice: '',
+        totalAmount: '',
+        purchaseDate: new Date().toISOString().split('T')[0],
+      }));
+      setFetchedName(dcaFor.name !== dcaFor.ticker ? dcaFor.name : '');
+      setIsDca(true);
+    }
+  }, [dcaFor, initial]);
+
+  // Detect DCA (adding to existing ticker+category) when user types ticker
+  useEffect(() => {
+    if (initial || dcaFor) return;
+    const ticker = form.ticker.trim().toUpperCase();
+    if (!ticker) { setIsDca(false); return; }
+    const exists = getStocks().some(
+      (s) => s.ticker === ticker && s.category === form.category
+    );
+    setIsDca(exists);
+  }, [form.ticker, form.category, initial, dcaFor]);
 
   async function handleFetchPrice() {
     if (!form.ticker.trim()) { setFetchError('กรุณาใส่ชื่อย่อหุ้นก่อน'); return; }
@@ -131,9 +162,16 @@ export default function StockFormModal({ initial, defaultCategory, onSave, onClo
 
         {/* Title */}
         <div className="flex items-center justify-between px-5 mb-6">
-          <h2 className="text-2xl font-bold text-slate-800">
-            {initial ? 'แก้ไขหุ้น' : 'เพิ่มหุ้นใหม่'}
-          </h2>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">
+              {initial ? 'แก้ไขหุ้น' : isDca ? 'ซื้อเพิ่ม (DCA)' : 'เพิ่มหุ้นใหม่'}
+            </h2>
+            {isDca && (
+              <p className="text-sm text-indigo-600 font-medium mt-0.5">
+                จะรวมเข้ากับ {form.ticker.toUpperCase()} ที่มีอยู่ และคำนวณราคาเฉลี่ยใหม่
+              </p>
+            )}
+          </div>
           <button onClick={onClose}
             className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center active:bg-slate-200">
             <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

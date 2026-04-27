@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getStocks, addStock, generateId } from '@/lib/storage';
+import { getStocks, addStock } from '@/lib/storage';
 import { Stock } from '@/lib/types';
 import { calculateStockValue } from '@/lib/stockCalculation';
 import { formatTHB, formatUSD } from '@/lib/taxCalculation';
@@ -120,7 +120,7 @@ function StocksContent() {
   }
 
   function handleSave(data: Omit<Stock, 'id'>) {
-    addStock({ ...data, id: generateId() });
+    addStock(data);
     setStocks(getStocks());
     setShowModal(false);
   }

@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getStocks, updateStock, deleteStock, addSellTransaction, generateId } from '@/lib/storage';
-import { Stock, SellTransaction } from '@/lib/types';
+import { getStocks, addStock, updateStock, deleteStock, addSellTransaction, generateId, removeLot, getDividends, addDividend, deleteDividend } from '@/lib/storage';
+import { Stock, StockLot, SellTransaction, Dividend } from '@/lib/types';
 import { calculateStockValue } from '@/lib/stockCalculation';
 import { formatTHB, formatUSD } from '@/lib/taxCalculation';
 import StockFormModal from '@/components/StockFormModal';
 import SellModal from '@/components/SellModal';
+import DividendModal from '@/components/DividendModal';
 
 function InfoRow({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
   return (
@@ -25,16 +26,23 @@ export default function StockDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showSell, setShowSell] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [showBuyMore, setShowBuyMore] = useState(false);
+  const [showDividend, setShowDividend] = useState(false);
+  const [dividends, setDividends] = useState<Dividend[]>([]);
   const [showAdc, setShowAdc] = useState(false);
   const [adcAmount, setAdcAmount] = useState('');
   const [adcPrice, setAdcPrice] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMsg, setRefreshMsg] = useState('');
+  const [confirmDeleteLot, setConfirmDeleteLot] = useState<string | null>(null);
 
   useEffect(() => {
     const found = getStocks().find((s) => s.id === params.id);
     if (!found) router.replace('/stocks');
-    else setStock(found);
+    else {
+      setStock(found);
+      setDividends(getDividends().filter((d) => d.stockId === params.id));
+    }
   }, [params.id, router]);
 
   async function handleRefreshPrice() {
@@ -57,10 +65,56 @@ export default function StockDetailPage() {
 
   function handleSaveEdit(data: Omit<Stock, 'id'>) {
     if (!stock) return;
-    const updated = { ...data, id: stock.id };
+    const isMultiLot = stock.lots && stock.lots.length > 1;
+    let updated: Stock;
+    if (isMultiLot) {
+      // Multi-lot: only update currentPrice and note; lots determine cost basis
+      updated = { ...stock, currentPrice: data.currentPrice, note: data.note };
+    } else {
+      // Single lot: full edit, update the lot to stay in sync
+      updated = {
+        ...data, id: stock.id,
+        lots: [{
+          ...stock.lots![0],
+          purchaseDate: data.purchaseDate,
+          purchasePrice: data.purchasePrice,
+          shares: data.shares,
+          buyCommission: data.buyCommission,
+        }],
+      };
+    }
     updateStock(updated);
     setStock(updated);
     setShowEdit(false);
+  }
+
+  function handleSaveDividend(data: Omit<Dividend, 'id'>) {
+    const d: Dividend = { ...data, id: generateId() };
+    addDividend(d);
+    setDividends((prev) => [...prev, d]);
+    setShowDividend(false);
+  }
+
+  function handleDeleteDividend(id: string) {
+    deleteDividend(id);
+    setDividends((prev) => prev.filter((d) => d.id !== id));
+  }
+
+  function handleBuyMore(data: Omit<Stock, 'id'>) {
+    if (!stock) return;
+    addStock(data);
+    const updated = getStocks().find((s) => s.id === stock.id);
+    if (updated) setStock(updated);
+    setShowBuyMore(false);
+  }
+
+  function handleRemoveLot(lotId: string) {
+    if (!stock) return;
+    removeLot(stock.id, lotId);
+    const updated = getStocks().find((s) => s.id === stock.id);
+    if (!updated) router.replace(`/stocks?tab=${stock.category}`);
+    else setStock(updated);
+    setConfirmDeleteLot(null);
   }
 
   function handleSell(txData: Omit<SellTransaction, 'id'>) {
@@ -155,7 +209,7 @@ export default function StockDetailPage() {
         </div>
       </div>
 
-      <div className="px-4 -mt-4 space-y-4 pb-8">
+      <div className="px-4 mt-4 space-y-4 pb-8">
 
         {/* Current Price Card */}
         <div className="card">
@@ -194,12 +248,18 @@ export default function StockDetailPage() {
         {/* Investment Details */}
         <div className="card">
           <h2 className="text-lg font-bold text-slate-700 mb-1">ข้อมูลการลงทุน</h2>
-          <InfoRow label="วันที่ซื้อ" value={stock.purchaseDate} />
+          <InfoRow
+            label={stock.lots && stock.lots.length > 1 ? 'วันที่ซื้อครั้งแรก' : 'วันที่ซื้อ'}
+            value={stock.purchaseDate}
+          />
           <InfoRow label={stock.category === 'fund' ? 'จำนวนหน่วย' : 'จำนวนหุ้น'}
             value={`${stock.shares % 1 === 0 ? stock.shares.toLocaleString('th-TH') : stock.shares.toFixed(4)} ${stock.category === 'fund' ? 'หน่วย' : 'หุ้น'}`} />
-          <InfoRow label="ราคาซื้อ / หุ้น" value={fmt(stock.purchasePrice)} />
+          <InfoRow
+            label={stock.lots && stock.lots.length > 1 ? 'ราคาทุนเฉลี่ย / หุ้น' : 'ราคาซื้อ / หุ้น'}
+            value={fmt(stock.purchasePrice)}
+          />
           {stock.buyCommission != null && stock.buyCommission > 0 && (
-            <InfoRow label="ค่าคอมมิชชั่นซื้อ" value={fmt(stock.buyCommission)} />
+            <InfoRow label="ค่าคอมมิชชั่นรวม" value={fmt(stock.buyCommission)} />
           )}
           <div className="mt-2 bg-indigo-50 rounded-2xl px-4 py-3 flex justify-between items-center">
             <div>
@@ -212,11 +272,101 @@ export default function StockDetailPage() {
           </div>
         </div>
 
+        {/* Purchase Lots — shown only when DCA (multiple lots) */}
+        {stock.lots && stock.lots.length > 1 && (
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-slate-700">ประวัติการซื้อ</h2>
+              <span className="text-xs bg-indigo-100 text-indigo-600 font-bold px-2.5 py-1 rounded-full">
+                {stock.lots.length} รอบ
+              </span>
+            </div>
+            {stock.lots.map((lot: StockLot, i: number) => {
+              const lotCost = lot.purchasePrice * lot.shares + (lot.buyCommission ?? 0);
+              return (
+                <div key={lot.id} className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">
+                  <div className="w-8 h-8 bg-indigo-100 rounded-xl flex items-center justify-center text-xs font-bold text-indigo-600 flex-shrink-0">
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-700">{lot.purchaseDate}</p>
+                    <p className="text-xs text-slate-400">
+                      {fmt(lot.purchasePrice)}/{unitLabel} × {lot.shares % 1 === 0 ? lot.shares.toLocaleString('th-TH') : lot.shares.toFixed(4)} {unitLabel}
+                    </p>
+                  </div>
+                  <div className="text-right flex items-center gap-2">
+                    <div>
+                      <p className="font-bold text-slate-800 text-sm">{fmt(lotCost)}</p>
+                      {lot.buyCommission ? (
+                        <p className="text-xs text-slate-400">+ค่าธ. {fmt(lot.buyCommission)}</p>
+                      ) : null}
+                    </div>
+                    <button
+                      onClick={() => setConfirmDeleteLot(lot.id)}
+                      className="w-8 h-8 bg-rose-50 rounded-xl flex items-center justify-center active:bg-rose-100 flex-shrink-0"
+                    >
+                      <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Note */}
         {stock.note && (
           <div className="card">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">หมายเหตุ</p>
             <p className="text-slate-700 text-base leading-relaxed">{stock.note}</p>
+          </div>
+        )}
+
+        {/* Dividend History */}
+        {dividends.length > 0 && (
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-slate-700">ประวัติเงินปันผล</h2>
+              <div className="text-right">
+                <p className="text-xs text-slate-400">รับสุทธิรวม</p>
+                <p className="font-black text-emerald-600 text-base">
+                  {fmt(dividends.reduce((s, d) => s + d.netAmount, 0))}
+                </p>
+              </div>
+            </div>
+            {[...dividends].sort((a, b) => b.date.localeCompare(a.date)).map((d) => (
+              <div key={d.id} className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">
+                <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center text-base flex-shrink-0">
+                  💰
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-700">{d.date}</p>
+                  <p className="text-xs text-slate-400">
+                    {fmt(d.amountPerShare)}/หุ้น × {d.shares % 1 === 0 ? d.shares.toLocaleString('th-TH') : d.shares.toFixed(4)}
+                    {d.withholdingTaxRate > 0 ? ` · หัก ${d.withholdingTaxRate}%` : ''}
+                  </p>
+                  {d.note && <p className="text-xs text-slate-400 italic">{d.note}</p>}
+                </div>
+                <div className="text-right flex items-center gap-2">
+                  <div>
+                    <p className="font-bold text-emerald-600 text-sm">{fmt(d.netAmount)}</p>
+                    {d.withholdingTax > 0 && (
+                      <p className="text-xs text-slate-400">รวม {fmt(d.grossAmount)}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleDeleteDividend(d.id)}
+                    className="w-8 h-8 bg-slate-50 rounded-xl flex items-center justify-center active:bg-rose-50 flex-shrink-0"
+                  >
+                    <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -304,16 +454,37 @@ export default function StockDetailPage() {
 
         {/* Actions */}
         <div className="space-y-3">
-          {/* Sell — primary action */}
+          {/* Buy More (DCA) + Sell — side by side primary actions */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowBuyMore(true)}
+              className="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-base text-white active:opacity-80"
+              style={{ background: 'linear-gradient(135deg, #059669, #10B981)', boxShadow: '0 4px 14px rgba(5,150,105,0.35)' }}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+              </svg>
+              ซื้อเพิ่ม
+            </button>
+            <button
+              onClick={() => setShowSell(true)}
+              className="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-base text-white active:opacity-80"
+              style={{ background: 'linear-gradient(135deg, #E11D48, #F43F5E)', boxShadow: '0 4px 14px rgba(225,29,72,0.35)' }}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              ขาย
+            </button>
+          </div>
+
+          {/* Dividend */}
           <button
-            onClick={() => setShowSell(true)}
-            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-base text-white active:opacity-80"
-            style={{ background: 'linear-gradient(135deg, #E11D48, #F43F5E)', boxShadow: '0 4px 14px rgba(225,29,72,0.35)' }}
+            onClick={() => setShowDividend(true)}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-base border-2 border-emerald-200 text-emerald-700 bg-emerald-50 active:bg-emerald-100"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            บันทึกการขาย
+            <span className="text-lg">💰</span>
+            บันทึกเงินปันผล
           </button>
 
           {/* Edit + Delete */}
@@ -340,6 +511,24 @@ export default function StockDetailPage() {
         </div>
       </div>
 
+      {showDividend && (
+        <DividendModal
+          stock={stock}
+          onSave={handleSaveDividend}
+          onClose={() => setShowDividend(false)}
+        />
+      )}
+
+      {showBuyMore && (
+        <StockFormModal
+          initial={null}
+          defaultCategory={stock.category}
+          dcaFor={{ ticker: stock.ticker, name: stock.name, category: stock.category, currentPrice: stock.currentPrice }}
+          onSave={handleBuyMore}
+          onClose={() => setShowBuyMore(false)}
+        />
+      )}
+
       {showSell && (
         <SellModal
           stock={stock}
@@ -363,7 +552,7 @@ export default function StockDetailPage() {
             <div className="text-center mb-5">
               <div className="w-16 h-16 bg-rose-100 rounded-3xl flex items-center justify-center mx-auto mb-3 text-3xl">🗑️</div>
               <h3 className="text-xl font-bold text-slate-800 mb-1">ยืนยันการลบ</h3>
-              <p className="text-slate-500">ลบหุ้น <strong>{stock.ticker}</strong> ออกจากพอร์ต?</p>
+              <p className="text-slate-500">ลบหุ้น <strong>{stock.ticker}</strong> ออกจากพอร์ตทั้งหมด?</p>
             </div>
             <div className="flex gap-3">
               <button onClick={() => setShowConfirmDelete(false)} className="flex-1 btn-secondary">ยกเลิก</button>
@@ -371,6 +560,28 @@ export default function StockDetailPage() {
                 className="flex-1 py-3.5 rounded-2xl font-bold text-lg text-white active:opacity-80"
                 style={{ background: 'linear-gradient(135deg, #E11D48, #F43F5E)' }}>
                 ลบเลย
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteLot && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-8 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm" style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div className="text-center mb-5">
+              <div className="w-16 h-16 bg-amber-100 rounded-3xl flex items-center justify-center mx-auto mb-3 text-3xl">📦</div>
+              <h3 className="text-xl font-bold text-slate-800 mb-1">ลบรอบซื้อนี้?</h3>
+              <p className="text-slate-500 text-sm">ระบบจะคำนวณราคาทุนเฉลี่ยใหม่จากรอบที่เหลือ</p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDeleteLot(null)} className="flex-1 btn-secondary">ยกเลิก</button>
+              <button
+                onClick={() => handleRemoveLot(confirmDeleteLot)}
+                className="flex-1 py-3.5 rounded-2xl font-bold text-lg text-white active:opacity-80"
+                style={{ background: 'linear-gradient(135deg, #D97706, #F59E0B)' }}
+              >
+                ลบรอบนี้
               </button>
             </div>
           </div>
